@@ -1,0 +1,90 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String         @id @default(cuid())
+  email          String         @unique
+  name           String?
+  passwordHash   String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  chats          Chat[]         @relation("Participants")
+  messages       Message[]
+  refreshTokens  RefreshToken[]
+  orders         Order[]
+}
+
+model Chat {
+  id         String    @id @default(cuid())
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  // Deelnemers (veel-op-veel)
+  participants User[]  @relation("Participants")
+  messages     Message[]
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  chat      Chat     @relation(fields: [chatId], references: [id])
+  chatId    String
+  sender    User     @relation(fields: [senderId], references: [id])
+  senderId  String
+
+  content   String
+  createdAt DateTime @default(now())
+}
+
+model RefreshToken {
+  id         String   @id @default(cuid())
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+  token      String   @unique
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  revokedAt  DateTime?
+}
+
+enum OrderStatus {
+  RECEIVED
+  PREPARING
+  ON_THE_WAY
+  DELIVERED
+}
+
+model Order {
+  id           String       @id @default(cuid())
+  orderNumber  String       @unique
+  user         User         @relation(fields: [userId], references: [id])
+  userId       String
+  paymentId    String
+  total        Decimal      @db.Decimal(10, 2)
+  status       OrderStatus  @default(RECEIVED)
+  receivedAt   DateTime     @default(now())
+  preparingAt  DateTime?
+  onTheWayAt   DateTime?
+  deliveredAt  DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  items        OrderItem[]
+
+  @@index([userId, orderNumber])
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId   String
+  itemId    String
+  name      String
+  qty       Int
+  price     Decimal @db.Decimal(10, 2)
+}
