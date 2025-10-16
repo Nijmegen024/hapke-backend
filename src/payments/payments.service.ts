@@ -55,7 +55,8 @@ export class PaymentsService {
         currency: 'EUR',
       },
       description: `Hapke order ${uuid().slice(0, 8)}`,
-      redirectUrl: 'http://localhost:3000/payments/success',
+      redirectUrl: this.getSuccessBaseUrl(),
+      webhookUrl: this.getWebhookUrl(),
       metadata: {
         email: options?.email ?? null,
         items: options.items,
@@ -103,9 +104,25 @@ export class PaymentsService {
   }
 
   private buildSuccessUrl(paymentId: string) {
-    const baseUrl = process.env.PAYMENTS_SUCCESS_URL_BASE || 'http://localhost:3000/payments/success';
+    const baseUrl =
+      process.env.PAYMENTS_SUCCESS_URL_BASE ||
+      `${(process.env.FRONTEND_URL || process.env.RENDER_EXTERNAL_URL || 'https://hapke-backend.onrender.com').replace(/\/+$/, '')}/payments/success`;
     const separator = baseUrl.includes('?') ? '&' : '?';
     return `${baseUrl}${separator}id=${encodeURIComponent(paymentId)}`;
+  }
+
+  private getSuccessBaseUrl() {
+    const explicit = (process.env.PAYMENTS_SUCCESS_URL_BASE || '').trim();
+    if (explicit) return explicit;
+    const base = (process.env.FRONTEND_URL || process.env.RENDER_EXTERNAL_URL || 'https://hapke-backend.onrender.com').replace(/\/+$/, '');
+    return `${base}/payments/success`;
+  }
+
+  private getWebhookUrl() {
+    const explicit = (process.env.PAYMENTS_WEBHOOK_URL || '').trim();
+    if (explicit) return explicit;
+    const base = (process.env.RENDER_EXTERNAL_URL || 'https://hapke-backend.onrender.com').replace(/\/+$/, '');
+    return `${base}/payments/webhook`;
   }
 
   async getPaymentStatus(paymentId: string): Promise<PaymentStatusResult> {
