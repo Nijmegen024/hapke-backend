@@ -34,22 +34,24 @@ export class MailService {
 
   async sendMail(to: string, subject: string, text: string) {
     try {
-      const info = await this.transporter.sendMail({
+      const info = (await this.transporter.sendMail({
         from: this.defaultFrom,
         to,
         subject,
         text,
-      });
+      })) as unknown;
+      const messageId = extractMessageId(info);
 
       console.log(
-        `Mail verstuurd naar ${to} (onderwerp: ${subject}, id: ${info.messageId || 'n/a'})`,
+        `Mail verstuurd naar ${to} (onderwerp: ${subject}, id: ${messageId})`,
       );
       return { ok: true };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
       console.warn(
-        `Mail verzenden mislukt naar ${to} (onderwerp: ${subject}): ${err?.message || err}`,
+        `Mail verzenden mislukt naar ${to} (onderwerp: ${subject}): ${message}`,
       );
-      return { ok: false, error: err?.message || String(err) };
+      return { ok: false, error: message };
     }
   }
 
@@ -57,8 +59,9 @@ export class MailService {
     try {
       await this.transporter.verify();
       return { ok: true };
-    } catch (err: any) {
-      return { ok: false, error: err?.message || String(err) };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { ok: false, error: message };
     }
   }
 
@@ -75,3 +78,11 @@ export class MailService {
     };
   }
 }
+
+const extractMessageId = (info: unknown) =>
+  typeof info === 'object' &&
+  info !== null &&
+  'messageId' in info &&
+  typeof (info as { messageId?: unknown }).messageId === 'string'
+    ? (info as { messageId: string }).messageId
+    : 'n/a';

@@ -1,14 +1,18 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { OrdersController } from './app.controller';
+import { Request } from 'express';
+import { OrdersController } from './orders/orders.controller';
 import { AuthController } from './auth/auth.controller';
-import { MailService } from './mail/mail.service';
+import { OrdersService } from './orders/orders.service';
 import { AuthService } from './auth/auth.service';
+import { CreateOrderDto } from './orders/dto/create-order.dto';
 
-const mailMock = () => ({
-  sendMail: jest.fn().mockResolvedValue({ ok: true }),
-  verify: jest.fn(),
-  configSummary: jest.fn(),
+const ordersMock = () => ({
+  createOrder: jest.fn().mockResolvedValue({ orderId: 'ORD-1' }),
+  getOrderStatus: jest.fn(),
+  getOrderDetail: jest.fn(),
 });
+
+type TestRequest = Request & { user?: { sub?: string; id?: string } };
 
 const fakeUser = {
   id: 'user-123',
@@ -30,33 +34,28 @@ const authMock = () => ({
 
 describe('OrdersController', () => {
   let controller: OrdersController;
-  let mailService: ReturnType<typeof mailMock>;
+  let ordersService: ReturnType<typeof ordersMock>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [OrdersController],
-      providers: [{ provide: MailService, useFactory: mailMock }],
+      providers: [{ provide: OrdersService, useFactory: ordersMock }],
     }).compile();
 
     controller = module.get<OrdersController>(OrdersController);
-    mailService = module.get(MailService);
+    ordersService = module.get(OrdersService);
   });
 
-  it('sends a confirmation mail when creating an order', async () => {
-    const body = {
+  it('roept OrdersService aan bij aanmaken van een order', async () => {
+    const body: CreateOrderDto = {
       items: [{ id: 'm1', qty: 2 }],
-      email: 'customer@example.com',
+      paymentId: 'pay-1',
     };
+    const req = { user: { sub: 'user-1' } } as TestRequest;
 
-    const result = await controller.create(body);
+    await controller.create(body, req);
 
-    expect(mailService.sendMail).toHaveBeenCalledTimes(1);
-    expect(mailService.sendMail).toHaveBeenCalledWith(
-      'customer@example.com',
-      expect.stringContaining('Hapke bestelling'),
-      expect.stringContaining('m1'),
-    );
-    expect(result.mail).toEqual({ ok: true });
+    expect(ordersService.createOrder).toHaveBeenCalledWith('user-1', body);
   });
 });
 

@@ -21,4 +21,6 @@ async function main() {
   console.log('Na :', !!after, after?.updatedAt);
   console.log(`✅ Wachtwoord ingesteld voor ${email}: ${newPass}`);
 }
-main().finally(() => prisma.$disconnect());
+void main().finally(() => {
+  void prisma.$disconnect();
+});

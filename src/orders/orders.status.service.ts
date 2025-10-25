@@ -21,8 +21,9 @@ export class OrdersStatusService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit() {
     this.interval = setInterval(() => {
-      this.progress().catch((err) => {
-        this.logger.error(`Failed to progress orders: ${err?.message || err}`);
+      this.progress().catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger.error(`Failed to progress orders: ${message}`);
       });
     }, MINUTE_MS);
   }

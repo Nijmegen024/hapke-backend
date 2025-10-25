@@ -63,8 +63,6 @@ export class OrdersService {
       restaurantId === demoRestaurantId
     );
 
-    const vendorId = (process.env.DEMO_VENDOR_ID || '').trim();
-
     const order = await this.prisma.order.create({
       data: {
         orderNumber,
@@ -89,9 +87,10 @@ export class OrdersService {
     await this.statusService.triggerNow();
 
     this.sendConfirmationMail(order, normalized, total, dto.email).catch(
-      (err) => {
+      (err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
         this.logger.warn(
-          `Order ${order.orderNumber}: mail verzenden mislukt - ${err?.message || err}`,
+          `Order ${order.orderNumber}: mail verzenden mislukt - ${message}`,
         );
       },
     );

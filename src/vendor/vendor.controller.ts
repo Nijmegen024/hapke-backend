@@ -5,7 +5,6 @@ import {
   Patch,
   Post,
   Param,
-  Query,
   UnauthorizedException,
   Req,
   HttpException,
@@ -14,6 +13,18 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrderStatus } from '@prisma/client';
+import type { Request } from 'express';
+
+type VendorLoginBody = {
+  email?: string;
+  password?: string;
+};
+
+type VendorJwtPayload = {
+  sub: string;
+  role: string;
+  restaurantId?: string;
+};
 
 @Controller('vendor')
 export class VendorController {
@@ -23,8 +34,9 @@ export class VendorController {
   ) {}
 
   @Post('login')
-  async login(@Body() body: any) {
-    const { email, password } = body;
+  async login(@Body() body: VendorLoginBody) {
+    const email = body.email?.trim();
+    const password = body.password?.trim();
     if (!email || !password)
       throw new UnauthorizedException('Email en wachtwoord verplicht');
     const token = await this.jwt.signAsync({
@@ -36,7 +48,7 @@ export class VendorController {
   }
 
   @Get('orders')
-  async getOrders(@Req() req: any, @Query('status') status?: string) {
+  async getOrders(@Req() req: Request) {
     this.decode(req);
     return this.prisma.order.findMany({
       include: { items: true },
@@ -47,7 +59,7 @@ export class VendorController {
 
   @Patch('orders/:id/status')
   async updateStatus(
-    @Req() req: any,
+    @Req() req: Request,
     @Param('id') id: string,
     @Body('status') status: string,
   ) {
@@ -97,13 +109,23 @@ export class VendorController {
     return { result: 'updated' };
   }
 
-  private decode(req: any) {
-    const auth = req.headers['authorization'] || '';
+  private decode(req: Request): VendorJwtPayload {
+    const auth = req.get('authorization') ?? '';
     const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
     if (!token) throw new UnauthorizedException('Geen token');
-    const payload = this.jwt.decode(token);
-    if (!payload || payload.role !== 'vendor')
+    const payload = this.decodeJwt(token);
+    if (!payload || typeof payload !== 'object')
       throw new UnauthorizedException('Token ongeldig');
-    return payload;
+    const vendorPayload = payload as Partial<VendorJwtPayload>;
+    if (
+      vendorPayload.role !== 'vendor' ||
+      typeof vendorPayload.sub !== 'string'
+    )
+      throw new UnauthorizedException('Token ongeldig');
+    return vendorPayload as VendorJwtPayload;
+  }
+
+  private decodeJwt(token: string): unknown {
+    return this.jwt.decode(token);
   }
 }

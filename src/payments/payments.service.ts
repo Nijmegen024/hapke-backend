@@ -5,7 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import createMollieClient, { PaymentStatus } from '@mollie/api-client';
-import type { MollieClient } from '@mollie/api-client';
+import type { MollieClient, PaymentCreateParams } from '@mollie/api-client';
 import { v4 as uuid } from 'uuid';
 import type { NormalizedOrderItem } from '../pricing';
 
@@ -59,7 +59,7 @@ export class PaymentsService {
 
     const amount = rounded > 0 ? rounded : 0.01;
     const value = amount.toFixed(2);
-    const createParams: Parameters<typeof this.mollie.payments.create>[0] = {
+    const createParams: PaymentCreateParams = {
       amount: {
         value,
         currency: 'EUR',
@@ -74,7 +74,7 @@ export class PaymentsService {
     };
 
     if ((options.method ?? '').toLowerCase() === 'ideal') {
-      (createParams as any).method = 'ideal';
+      createParams.method = 'ideal' as PaymentCreateParams['method'];
     }
 
     try {
@@ -84,9 +84,10 @@ export class PaymentsService {
         await this.mollie.payments.update(payment.id, {
           redirectUrl: successUrl,
         });
-      } catch (updateError: any) {
+      } catch (updateError: unknown) {
+        const message = getErrorMessage(updateError);
         this.logger.warn(
-          `Failed to update redirect URL for payment ${payment.id}: ${updateError?.message || updateError}`,
+          `Failed to update redirect URL for payment ${payment.id}: ${message}`,
         );
       }
       return {
@@ -95,9 +96,11 @@ export class PaymentsService {
         successUrl,
         status: payment.status,
       };
-    } catch (error: any) {
-      const statusCode = error?.response?.status ?? 'n/a';
-      const responseBody = error?.response?.body;
+    } catch (error: unknown) {
+      const response = extractErrorResponse(error);
+      const statusCode =
+        typeof response?.status === 'number' ? response.status : 'n/a';
+      const responseBody = response?.body;
       const bodyString =
         typeof responseBody === 'string'
           ? responseBody
@@ -105,11 +108,13 @@ export class PaymentsService {
             ? JSON.stringify(responseBody)
             : 'null';
       const message =
-        (typeof responseBody === 'object' && responseBody?.detail) ||
-        error?.message ||
+        (isRecord(responseBody) && typeof responseBody.detail === 'string'
+          ? responseBody.detail
+          : null) ||
+        getErrorMessage(error) ||
         'Payment creation failed';
       this.logger.error(
-        `Failed to create Mollie payment -> message=${error?.message ?? error}; status=${statusCode}; body=${bodyString}`,
+        `Failed to create Mollie payment -> message=${getErrorMessage(error)}; status=${statusCode}; body=${bodyString}`,
       );
       throw new BadRequestException(message);
     }
@@ -167,9 +172,10 @@ export class PaymentsService {
         amount: payment.amount ?? null,
         simulated: false,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = getErrorMessage(error);
       this.logger.error(
-        `Failed to fetch Mollie payment ${paymentId}: ${error?.message || error}`,
+        `Failed to fetch Mollie payment ${paymentId}: ${message}`,
       );
       throw new InternalServerErrorException('Payment lookup failed');
     }
@@ -206,3 +212,26 @@ export class PaymentsService {
     return payment;
   }
 }
+
+type ErrorResponseShape = {
+  status?: number;
+  body?: unknown;
+};
+
+const isRecord = (
+  value: unknown,
+): value is Record<string | number | symbol, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const extractErrorResponse = (
+  error: unknown,
+): ErrorResponseShape | undefined => {
+  if (!isRecord(error) || !('response' in error)) {
+    return undefined;
+  }
+  const response = (error as { response?: unknown }).response;
+  return isRecord(response) ? (response as ErrorResponseShape) : undefined;
+};
+
+const getErrorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : String(error);

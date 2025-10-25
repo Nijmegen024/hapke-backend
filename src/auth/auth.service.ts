@@ -67,7 +67,8 @@ export class AuthService {
       if (error instanceof UnauthorizedException) {
         throw error;
       }
-      this.logger.error(`Login fout voor ${email}: ${error?.message || error}`);
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Login fout voor ${email}: ${message}`);
       throw new UnauthorizedException('Ongeldige inlog');
     }
   }
