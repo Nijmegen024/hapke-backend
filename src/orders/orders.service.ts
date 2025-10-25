@@ -42,6 +42,13 @@ export class OrdersService {
     const orderNumber = `ORD-${Date.now()}`;
     const receivedAt = new Date();
 
+    const demoVendorId = (process.env.DEMO_VENDOR_ID || '').trim();
+    const demoRestaurantId = (process.env.DEMO_RESTAURANT_ID || '').trim();
+    const restaurantId = dto.restaurantId ? dto.restaurantId.toString().trim() : '';
+    const attachDemoVendor = !!(restaurantId && demoRestaurantId && demoVendorId && restaurantId === demoRestaurantId);
+
+    const vendorId = (process.env.DEMO_VENDOR_ID || '').trim();
+
     const order = await this.prisma.order.create({
       data: {
         orderNumber,
@@ -50,6 +57,7 @@ export class OrdersService {
         total: new Prisma.Decimal(total.toFixed(2)),
         status: OrderStatus.RECEIVED,
         receivedAt,
+        ...(attachDemoVendor ? { vendorId: demoVendorId } : {}),
         items: {
           create: normalized.map(item => ({
             itemId: item.id,
