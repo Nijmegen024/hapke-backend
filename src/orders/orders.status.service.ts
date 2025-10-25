@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrderStatus } from '@prisma/client';
 
@@ -16,7 +21,7 @@ export class OrdersStatusService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit() {
     this.interval = setInterval(() => {
-      this.progress().catch(err => {
+      this.progress().catch((err) => {
         this.logger.error(`Failed to progress orders: ${err?.message || err}`);
       });
     }, MINUTE_MS);

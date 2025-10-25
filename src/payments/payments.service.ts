@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import createMollieClient, { PaymentStatus } from '@mollie/api-client';
 import type { MollieClient } from '@mollie/api-client';
 import { v4 as uuid } from 'uuid';
@@ -22,7 +27,9 @@ export class PaymentsService {
   constructor() {
     const apiKey = (process.env.MOLLIE_API_KEY || '').trim();
     if (!apiKey) {
-      this.logger.warn('MOLLIE_API_KEY not set – payment creation will return a 400 error.');
+      this.logger.warn(
+        'MOLLIE_API_KEY not set – payment creation will return a 400 error.',
+      );
       this.mollie = null;
     } else {
       this.mollie = createMollieClient({ apiKey });
@@ -44,7 +51,10 @@ export class PaymentsService {
       throw new BadRequestException('Mollie API key niet geconfigureerd');
     }
 
-    const total = options.items.reduce((sum, item) => sum + item.price * item.qty, 0);
+    const total = options.items.reduce(
+      (sum, item) => sum + item.price * item.qty,
+      0,
+    );
     const rounded = Math.round(total * 100) / 100;
 
     const amount = rounded > 0 ? rounded : 0.01;
@@ -71,7 +81,9 @@ export class PaymentsService {
       const payment = await this.mollie.payments.create(createParams);
       const successUrl = this.buildSuccessUrl(payment.id);
       try {
-        await this.mollie.payments.update(payment.id, { redirectUrl: successUrl });
+        await this.mollie.payments.update(payment.id, {
+          redirectUrl: successUrl,
+        });
       } catch (updateError: any) {
         this.logger.warn(
           `Failed to update redirect URL for payment ${payment.id}: ${updateError?.message || updateError}`,
@@ -90,8 +102,8 @@ export class PaymentsService {
         typeof responseBody === 'string'
           ? responseBody
           : responseBody
-          ? JSON.stringify(responseBody)
-          : 'null';
+            ? JSON.stringify(responseBody)
+            : 'null';
       const message =
         (typeof responseBody === 'object' && responseBody?.detail) ||
         error?.message ||
@@ -114,14 +126,20 @@ export class PaymentsService {
   private getSuccessBaseUrl() {
     const explicit = (process.env.PAYMENTS_SUCCESS_URL_BASE || '').trim();
     if (explicit) return explicit;
-    const base = (process.env.FRONTEND_URL || process.env.RENDER_EXTERNAL_URL || 'https://hapke-backend.onrender.com').replace(/\/+$/, '');
+    const base = (
+      process.env.FRONTEND_URL ||
+      process.env.RENDER_EXTERNAL_URL ||
+      'https://hapke-backend.onrender.com'
+    ).replace(/\/+$/, '');
     return `${base}/payments/success`;
   }
 
   private getWebhookUrl() {
     const explicit = (process.env.PAYMENTS_WEBHOOK_URL || '').trim();
     if (explicit) return explicit;
-    const base = (process.env.RENDER_EXTERNAL_URL || 'https://hapke-backend.onrender.com').replace(/\/+$/, '');
+    const base = (
+      process.env.RENDER_EXTERNAL_URL || 'https://hapke-backend.onrender.com'
+    ).replace(/\/+$/, '');
     return `${base}/payments/webhook`;
   }
 
@@ -150,25 +168,39 @@ export class PaymentsService {
         simulated: false,
       };
     } catch (error: any) {
-      this.logger.error(`Failed to fetch Mollie payment ${paymentId}: ${error?.message || error}`);
+      this.logger.error(
+        `Failed to fetch Mollie payment ${paymentId}: ${error?.message || error}`,
+      );
       throw new InternalServerErrorException('Payment lookup failed');
     }
   }
 
   private registerSimulatedPayment(paymentId: string, amount: number) {
-    this.logger.debug(`Simulated payment registered: ${paymentId} amount=${amount}`);
+    this.logger.debug(
+      `Simulated payment registered: ${paymentId} amount=${amount}`,
+    );
   }
 
-  async ensurePaid(paymentId: string, expectedAmount: number): Promise<PaymentStatusResult> {
+  async ensurePaid(
+    paymentId: string,
+    expectedAmount: number,
+  ): Promise<PaymentStatusResult> {
     const payment = await this.getPaymentStatus(paymentId);
     if (payment.status !== 'paid') {
-      throw new BadRequestException(`Payment ${paymentId} heeft status ${payment.status}`);
+      throw new BadRequestException(
+        `Payment ${paymentId} heeft status ${payment.status}`,
+      );
     }
     if (payment.amount?.value) {
       const amountNumber = Number(payment.amount.value);
       const roundedExpected = Math.round(expectedAmount * 100) / 100;
-      if (!Number.isNaN(amountNumber) && Math.abs(amountNumber - roundedExpected) > 0.01) {
-        this.logger.warn(`Payment amount mismatch for ${paymentId}: expected ${roundedExpected}, got ${amountNumber}`);
+      if (
+        !Number.isNaN(amountNumber) &&
+        Math.abs(amountNumber - roundedExpected) > 0.01
+      ) {
+        this.logger.warn(
+          `Payment amount mismatch for ${paymentId}: expected ${roundedExpected}, got ${amountNumber}`,
+        );
       }
     }
     return payment;

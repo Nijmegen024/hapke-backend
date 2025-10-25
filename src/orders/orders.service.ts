@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
 import { Prisma, OrderStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaymentsService } from '../payments/payments.service';
@@ -36,7 +42,10 @@ export class OrdersService {
       throw new BadRequestException('paymentId is verplicht');
     }
 
-    const total = normalized.reduce((sum, item) => sum + item.price * item.qty, 0);
+    const total = normalized.reduce(
+      (sum, item) => sum + item.price * item.qty,
+      0,
+    );
     await this.payments.ensurePaid(paymentId, total);
 
     const orderNumber = `ORD-${Date.now()}`;
@@ -44,8 +53,15 @@ export class OrdersService {
 
     const demoVendorId = (process.env.DEMO_VENDOR_ID || '').trim();
     const demoRestaurantId = (process.env.DEMO_RESTAURANT_ID || '').trim();
-    const restaurantId = dto.restaurantId ? dto.restaurantId.toString().trim() : '';
-    const attachDemoVendor = !!(restaurantId && demoRestaurantId && demoVendorId && restaurantId === demoRestaurantId);
+    const restaurantId = dto.restaurantId
+      ? dto.restaurantId.toString().trim()
+      : '';
+    const attachDemoVendor = !!(
+      restaurantId &&
+      demoRestaurantId &&
+      demoVendorId &&
+      restaurantId === demoRestaurantId
+    );
 
     const vendorId = (process.env.DEMO_VENDOR_ID || '').trim();
 
@@ -59,7 +75,7 @@ export class OrdersService {
         receivedAt,
         ...(attachDemoVendor ? { vendorId: demoVendorId } : {}),
         items: {
-          create: normalized.map(item => ({
+          create: normalized.map((item) => ({
             itemId: item.id,
             name: item.name,
             qty: item.qty,
@@ -72,9 +88,13 @@ export class OrdersService {
 
     await this.statusService.triggerNow();
 
-    this.sendConfirmationMail(order, normalized, total, dto.email).catch(err => {
-      this.logger.warn(`Order ${order.orderNumber}: mail verzenden mislukt - ${err?.message || err}`);
-    });
+    this.sendConfirmationMail(order, normalized, total, dto.email).catch(
+      (err) => {
+        this.logger.warn(
+          `Order ${order.orderNumber}: mail verzenden mislukt - ${err?.message || err}`,
+        );
+      },
+    );
 
     return {
       orderId: order.orderNumber,
@@ -82,13 +102,13 @@ export class OrdersService {
       total,
       createdAt: order.createdAt.toISOString(),
       etaMinutes: this.calculateEta(order),
-      items: order.items.map(item => ({
+      items: order.items.map((item) => ({
         id: item.itemId,
         name: item.name,
         qty: item.qty,
         price: Number(item.price),
       })),
-      steps: this.mapSteps(order).map(step => ({
+      steps: this.mapSteps(order).map((step) => ({
         name: step.name,
         at: step.at ? step.at.toISOString() : null,
       })),
@@ -110,13 +130,13 @@ export class OrdersService {
       total: Number(order.total),
       createdAt: order.createdAt.toISOString(),
       etaMinutes: this.calculateEta(order),
-      items: order.items.map(item => ({
+      items: order.items.map((item) => ({
         id: item.itemId,
         name: item.name,
         qty: item.qty,
         price: Number(item.price),
       })),
-      steps: this.mapSteps(order).map(step => ({
+      steps: this.mapSteps(order).map((step) => ({
         name: step.name,
         at: step.at ? step.at.toISOString() : null,
       })),
@@ -134,14 +154,17 @@ export class OrdersService {
       orderId: order.orderNumber,
       status: order.status,
       etaMinutes: this.calculateEta(order),
-      steps: this.mapSteps(order).map(step => ({
+      steps: this.mapSteps(order).map((step) => ({
         name: step.name,
         at: step.at ? step.at.toISOString() : null,
       })),
     };
   }
 
-  private calculateEta(order: { receivedAt: Date; deliveredAt: Date | null }): number {
+  private calculateEta(order: {
+    receivedAt: Date;
+    deliveredAt: Date | null;
+  }): number {
     if (order.deliveredAt) {
       return 0;
     }
@@ -177,11 +200,15 @@ export class OrdersService {
 
     const toAddress =
       email ||
-      (process.env.SMTP_TO || process.env.MAIL_TO_TEST || '').toString().trim() ||
+      (process.env.SMTP_TO || process.env.MAIL_TO_TEST || '')
+        .toString()
+        .trim() ||
       'dev@hapke.local';
 
     const lines = items
-      .map(it => `• ${it.name} x${it.qty}  (€${(it.price * it.qty).toFixed(2)})`)
+      .map(
+        (it) => `• ${it.name} x${it.qty}  (€${(it.price * it.qty).toFixed(2)})`,
+      )
       .join('\n');
     const text = [
       'Bedankt voor je bestelling!',
@@ -195,6 +222,10 @@ export class OrdersService {
       '— Team Hapke',
     ].join('\n');
 
-    await this.mail.sendMail(toAddress, `Hapke bestelling ${order.orderNumber}`, text);
+    await this.mail.sendMail(
+      toAddress,
+      `Hapke bestelling ${order.orderNumber}`,
+      text,
+    );
   }
 }

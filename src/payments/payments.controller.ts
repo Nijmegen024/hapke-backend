@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Header, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { normalizeItems } from '../pricing';
 import { PaymentsService } from './payments.service';
 
@@ -15,7 +23,9 @@ export class PaymentsController {
       email?: string;
     },
   ) {
-    const normalized = normalizeItems(Array.isArray(body?.items) ? body.items : []);
+    const normalized = normalizeItems(
+      Array.isArray(body?.items) ? body.items : [],
+    );
     return this.payments.createPayment({
       method: body?.method,
       items: normalized,

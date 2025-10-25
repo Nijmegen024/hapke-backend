@@ -43,7 +43,10 @@ describe('OrdersController', () => {
   });
 
   it('sends a confirmation mail when creating an order', async () => {
-    const body = { items: [{ id: 'm1', qty: 2 }], email: 'customer@example.com' };
+    const body = {
+      items: [{ id: 'm1', qty: 2 }],
+      email: 'customer@example.com',
+    };
 
     const result = await controller.create(body);
 
@@ -64,9 +67,7 @@ describe('AuthController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
-      providers: [
-        { provide: AuthService, useFactory: authMock },
-      ],
+      providers: [{ provide: AuthService, useFactory: authMock }],
     }).compile();
 
     controller = module.get<AuthController>(AuthController);
@@ -74,16 +75,28 @@ describe('AuthController', () => {
   });
 
   it('registreert een nieuwe gebruiker', async () => {
-    const result = await controller.register({ email: 'newuser@example.com', password: 'secret!' });
+    const result = await controller.register({
+      email: 'newuser@example.com',
+      password: 'secret!',
+    });
 
-    expect(authService.register).toHaveBeenCalledWith({ email: 'newuser@example.com', password: 'secret!' });
+    expect(authService.register).toHaveBeenCalledWith({
+      email: 'newuser@example.com',
+      password: 'secret!',
+    });
     expect(result).toEqual(fakeAuthResponse);
   });
 
   it('geeft een JWT terug bij login', async () => {
-    const result = await controller.login({ email: 'newuser@example.com', password: 'secret!' });
+    const result = await controller.login({
+      email: 'newuser@example.com',
+      password: 'secret!',
+    });
 
-    expect(authService.login).toHaveBeenCalledWith({ email: 'newuser@example.com', password: 'secret!' });
+    expect(authService.login).toHaveBeenCalledWith({
+      email: 'newuser@example.com',
+      password: 'secret!',
+    });
     expect(result).toEqual(fakeAuthResponse);
   });
 });

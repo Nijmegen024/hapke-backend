@@ -8,7 +8,11 @@ export class HealthController {
   @Get('mail')
   async mailHealth() {
     if (!this.mail) {
-      return { ok: false, error: 'MailService not available', ts: new Date().toISOString() };
+      return {
+        ok: false,
+        error: 'MailService not available',
+        ts: new Date().toISOString(),
+      };
     }
     const verify = await this.mail.verify();
     return {
@@ -18,4 +22,3 @@ export class HealthController {
     };
   }
 }
-

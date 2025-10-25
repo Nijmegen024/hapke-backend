@@ -15,8 +15,12 @@ export class MailService {
     const user = process.env.SMTP_USER;
     const pass = process.env.SMTP_PASS;
 
-    const fromEnv =
-      (process.env.FROM_EMAIL || process.env.SMTP_FROM || process.env.MAIL_FROM || '').trim();
+    const fromEnv = (
+      process.env.FROM_EMAIL ||
+      process.env.SMTP_FROM ||
+      process.env.MAIL_FROM ||
+      ''
+    ).trim();
     this.defaultFrom = fromEnv || 'Hapke <noreply@hapke.app>';
 
     this.transporter = nodemailer.createTransport({
@@ -30,13 +34,21 @@ export class MailService {
 
   async sendMail(to: string, subject: string, text: string) {
     try {
-      const info = await this.transporter.sendMail({ from: this.defaultFrom, to, subject, text });
-      // eslint-disable-next-line no-console
-      console.log(`Mail verstuurd naar ${to} (onderwerp: ${subject}, id: ${info.messageId || 'n/a'})`);
+      const info = await this.transporter.sendMail({
+        from: this.defaultFrom,
+        to,
+        subject,
+        text,
+      });
+
+      console.log(
+        `Mail verstuurd naar ${to} (onderwerp: ${subject}, id: ${info.messageId || 'n/a'})`,
+      );
       return { ok: true };
     } catch (err: any) {
-      // eslint-disable-next-line no-console
-      console.warn(`Mail verzenden mislukt naar ${to} (onderwerp: ${subject}): ${err?.message || err}`);
+      console.warn(
+        `Mail verzenden mislukt naar ${to} (onderwerp: ${subject}): ${err?.message || err}`,
+      );
       return { ok: false, error: err?.message || String(err) };
     }
   }

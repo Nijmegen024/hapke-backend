@@ -67,7 +67,7 @@ export function nameFor(itemId: string): string {
 }
 
 export function normalizeItems(items: OrderItemInput[]): NormalizedOrderItem[] {
-  return items.map(item => ({
+  return items.map((item) => ({
     id: String(item.id),
     name: nameFor(String(item.id)),
     qty: Math.max(1, Number(item.qty) || 1),

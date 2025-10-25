@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 
@@ -11,7 +16,10 @@ import { User } from '@prisma/client';
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
-  constructor(private readonly prisma: PrismaService, private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwtService: JwtService,
+  ) {}
 
   async register(dto: RegisterDto) {
     const email = dto.email.toLowerCase().trim();
@@ -39,11 +47,16 @@ export class AuthService {
       const user = await this.prisma.user.findUnique({ where: { email } });
 
       if (!user) {
-        this.logger.warn(`Login mislukte voor ${email}: gebruiker niet gevonden`);
+        this.logger.warn(
+          `Login mislukte voor ${email}: gebruiker niet gevonden`,
+        );
         throw new UnauthorizedException('Ongeldige inlog');
       }
 
-      const passwordMatch = await bcrypt.compare(dto.password, user.passwordHash);
+      const passwordMatch = await bcrypt.compare(
+        dto.password,
+        user.passwordHash,
+      );
       if (!passwordMatch) {
         this.logger.warn(`Login mislukte voor ${email}: wachtwoord mismatch`);
         throw new UnauthorizedException('Ongeldige inlog');

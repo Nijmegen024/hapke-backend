@@ -1,4 +1,13 @@
-import { ArrayNotEmpty, IsArray, IsIn, IsInt, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
+import {
+  ArrayNotEmpty,
+  IsArray,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class PaymentItemDto {
@@ -26,7 +35,7 @@ export class CreatePaymentDto {
   @IsOptional()
   @IsString()
   @IsIn(ALLOWED_METHODS)
-  method?: typeof ALLOWED_METHODS[number];
+  method?: (typeof ALLOWED_METHODS)[number];
 
   @IsOptional()
   @IsString()

@@ -1,4 +1,10 @@
-import { ArrayNotEmpty, IsArray, IsOptional, IsString, ValidateNested } from 'class-validator';
+import {
+  ArrayNotEmpty,
+  IsArray,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { PaymentItemDto } from '../../payments/dto/create-payment.dto';
 
@@ -12,6 +18,10 @@ export class CreateOrderDto {
   @IsOptional()
   @IsString()
   email?: string;
+
+  @IsOptional()
+  @IsString()
+  restaurantId?: string;
 
   @IsString()
   paymentId!: string;
