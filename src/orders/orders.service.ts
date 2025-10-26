@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
   Optional,
@@ -52,34 +53,12 @@ export class OrdersService {
     const receivedAt = new Date();
 
     const demoVendorId = (process.env.DEMO_VENDOR_ID || '').trim();
-    const demoRestaurantId = (process.env.DEMO_RESTAURANT_ID || '').trim();
-    const restaurantId = dto.restaurantId
-      ? dto.restaurantId.toString().trim()
-      : '';
-    const attachDemoVendor = !!(
-      restaurantId &&
-      demoRestaurantId &&
-      demoVendorId &&
-      restaurantId === demoRestaurantId
-    );
-
-    this.logger.log(`DEMO_DEBUG restaurantId=${dto.restaurantId} key=${process.env.DEMO_RESTAURANT_KEY} vendor=${process.env.DEMO_VENDOR_ID}`);
-
-    // Demo-koppeling via restaurant key (enkel voor 1 restaurant)
-    const demoRestaurantKey = (process.env.DEMO_RESTAURANT_KEY || '').trim();
-    const attachDemoRestaurant = !!(demoRestaurantKey && dto.restaurantId?.toString().trim() === demoRestaurantKey);
-
-    // Fallback: force vendor attach for all demo orders when flag is enabled
-    const forceVendor =
-      (process.env.DEMO_FORCE_VENDOR || '').toLowerCase() === 'true';
-
-    // Optional: hard switch to always attach vendor (for troubleshooting)
-    const alwaysVendor =
-      (process.env.DEMO_ALWAYS_VENDOR || '').toLowerCase() === 'true';
-
-    this.logger.log(
-      `VENDOR_ATTACH flags => always=${alwaysVendor} force=${forceVendor} attachById=${attachDemoVendor} attachByKey=${attachDemoRestaurant} vendorId=${demoVendorId}`
-    );
+    if (!demoVendorId) {
+      this.logger.error(
+        'DEMO_VENDOR_ID ontbreekt - order kan niet worden gekoppeld.',
+      );
+      throw new InternalServerErrorException('Vendor configuratie ontbreekt');
+    }
 
     const order = await this.prisma.order.create({
       data: {
@@ -89,9 +68,7 @@ export class OrdersService {
         total: new Prisma.Decimal(total.toFixed(2)),
         status: OrderStatus.RECEIVED,
         receivedAt,
-        ...(alwaysVendor || forceVendor || attachDemoVendor || attachDemoRestaurant
-          ? { vendorId: demoVendorId }
-          : {}),
+        vendorId: demoVendorId,
         items: {
           create: normalized.map((item) => ({
             itemId: item.id,

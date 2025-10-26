@@ -4,10 +4,11 @@ import { PaymentsModule } from '../payments/payments.module';
 import { OrdersStatusService } from './orders.status.service';
 import { OrdersController } from './orders.controller';
 import { MailModule } from '../mail/mail.module';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Module({
   imports: [PaymentsModule, MailModule],
   controllers: [OrdersController],
-  providers: [OrdersService, OrdersStatusService],
+  providers: [OrdersService, OrdersStatusService, PrismaService],
 })
 export class OrdersModule {}
