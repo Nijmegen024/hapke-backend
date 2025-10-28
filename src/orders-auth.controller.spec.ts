@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 import { OrdersController } from './orders/orders.controller';
 import { AuthController } from './auth/auth.controller';
 import { OrdersService } from './orders/orders.service';
@@ -21,14 +21,25 @@ const fakeUser = {
   createdAt: new Date(),
 };
 
-const fakeAuthResponse = {
+const fakeRegisterResponse = {
   user: fakeUser,
-  access_token: 'access-xyz',
+};
+
+const fakeLoginServiceResult = {
+  accessToken: 'access-xyz',
+  refreshToken: 'refresh-xyz',
+  refreshExpiresAt: new Date(),
+  user: fakeUser,
 };
 
 const authMock = () => ({
-  register: jest.fn().mockResolvedValue(fakeAuthResponse),
-  login: jest.fn().mockResolvedValue(fakeAuthResponse),
+  register: jest.fn().mockResolvedValue(fakeRegisterResponse),
+  login: jest.fn().mockResolvedValue(fakeLoginServiceResult),
+  refreshTokens: jest.fn(),
+  logout: jest.fn(),
+  attachRefreshCookie: jest.fn(),
+  clearRefreshCookie: jest.fn(),
+  extractRefreshToken: jest.fn(),
   getUserById: jest.fn(),
 });
 
@@ -83,19 +94,25 @@ describe('AuthController', () => {
       email: 'newuser@example.com',
       password: 'secret!',
     });
-    expect(result).toEqual(fakeAuthResponse);
+    expect(result).toEqual(fakeRegisterResponse);
   });
 
   it('geeft een JWT terug bij login', async () => {
-    const result = await controller.login({
+    const res = { cookie: jest.fn() } as unknown as Response;
+    const dto = {
       email: 'newuser@example.com',
       password: 'secret!',
-    });
+    };
+    const result = await controller.login(dto, res);
 
-    expect(authService.login).toHaveBeenCalledWith({
-      email: 'newuser@example.com',
-      password: 'secret!',
+    expect(authService.login).toHaveBeenCalledWith(dto);
+    expect(authService.attachRefreshCookie).toHaveBeenCalledWith(
+      res,
+      fakeLoginServiceResult.refreshToken,
+    );
+    expect(result).toEqual({
+      accessToken: fakeLoginServiceResult.accessToken,
+      user: fakeUser,
     });
-    expect(result).toEqual(fakeAuthResponse);
   });
 });

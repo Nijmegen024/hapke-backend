@@ -20,6 +20,7 @@ model User {
   messages       Message[]
   refreshTokens  RefreshToken[]
   orders         Order[]
+  addresses      Address[]
 }
 
 model Chat {
@@ -47,10 +48,12 @@ model RefreshToken {
   id         String   @id @default(cuid())
   user       User     @relation(fields: [userId], references: [id])
   userId     String
-  token      String   @unique
+  tokenHash  String   @unique
   expiresAt  DateTime
   createdAt  DateTime @default(now())
   revokedAt  DateTime?
+
+  @@index([userId])
 }
 
 enum OrderStatus {
@@ -99,4 +102,21 @@ model Vendor {
   name      String
   orders    Order[]
   createdAt DateTime @default(now())
+}
+
+model Address {
+  id          String   @id @default(cuid())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  street      String
+  houseNumber String
+  postalCode  String
+  city        String
+  lat         Float?
+  lng         Float?
+  isPrimary   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, isPrimary])
 }

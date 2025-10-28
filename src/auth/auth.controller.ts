@@ -1,4 +1,16 @@
-import { Body, Controller, HttpCode, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Post,
+  Req,
+  Res,
+  UnauthorizedException,
+  UseGuards,
+} from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import type { Request, Response } from 'express';
 
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -15,7 +27,53 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(200)
-  async login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  async login(
+    @Body() dto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.login(dto);
+    this.authService.attachRefreshCookie(res, result.refreshToken);
+    return {
+      accessToken: result.accessToken,
+      user: result.user,
+    };
+  }
+
+  @Post('refresh')
+  @HttpCode(200)
+  async refresh(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const refreshToken = this.authService.extractRefreshToken(req);
+    const result = await this.authService.refreshTokens(refreshToken);
+    this.authService.attachRefreshCookie(res, result.refreshToken);
+    return {
+      accessToken: result.accessToken,
+      user: result.user,
+    };
+  }
+
+  @Post('logout')
+  @HttpCode(204)
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const refreshToken = this.authService.extractRefreshToken(req);
+    await this.authService.logout(refreshToken);
+    this.authService.clearRefreshCookie(res);
+    return;
+  }
+
+  @Get('me')
+  @UseGuards(AuthGuard('jwt'))
+  async me(@Req() req: Request & { user?: { id?: string } }) {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new UnauthorizedException('Geen gebruiker gevonden');
+    }
+    const user = await this.authService.getUserById(userId);
+    if (!user) {
+      throw new UnauthorizedException('Gebruiker niet gevonden');
+    }
+    return { user };
   }
 }
