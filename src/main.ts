@@ -16,6 +16,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.use(cookieParser());
   app.use(express.urlencoded({ extended: true }));
+  app.use(express.json());
   app.enableCors({ origin: true, credentials: true });
 
   const port = parseInt(process.env.PORT ?? '3000', 10);
