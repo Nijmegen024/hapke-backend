@@ -16,7 +16,7 @@ type PendingFriendPayload = {
   friendshipId: string;
   createdAt: Date;
   requester: { id: string; email: string; name: string | null };
-  addressee: { id: string; email: string; name: string | null };
+  recipient: { id: string; email: string; name: string | null };
 };
 
 @Injectable()
@@ -57,10 +57,10 @@ export class FriendsService {
         OR: [
           {
             requesterId: currentUserId,
-            addresseeId: { in: matches.map((m) => m.id) },
+            recipientId: { in: matches.map((m) => m.id) },
           },
           {
-            addresseeId: currentUserId,
+            recipientId: currentUserId,
             requesterId: { in: matches.map((m) => m.id) },
           },
         ],
@@ -74,10 +74,13 @@ export class FriendsService {
 
     for (const row of friendshipRows) {
       const status = this.mapStatus(currentUserId, row);
-      relationshipByUser.set(row.requesterId === currentUserId ? row.addresseeId : row.requesterId, {
-        status,
-        friendshipId: row.id,
-      });
+      relationshipByUser.set(
+        row.requesterId === currentUserId ? row.recipientId : row.requesterId,
+        {
+          status,
+          friendshipId: row.id,
+        },
+      );
     }
 
     return matches.map((user) => {
@@ -99,20 +102,20 @@ export class FriendsService {
         status: FriendshipStatus.ACCEPTED,
         OR: [
           { requesterId: currentUserId },
-          { addresseeId: currentUserId },
+          { recipientId: currentUserId },
         ],
       },
-      orderBy: [{ respondedAt: 'desc' }, { createdAt: 'desc' }],
+      orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
       include: {
         requester: { select: { id: true, email: true, name: true } },
-        addressee: { select: { id: true, email: true, name: true } },
+        recipient: { select: { id: true, email: true, name: true } },
       },
     });
 
     return friendships.map((friendship) => {
       const otherUser =
         friendship.requesterId === currentUserId
-          ? friendship.addressee
+          ? friendship.recipient
           : friendship.requester;
       return {
         friendshipId: friendship.id,
@@ -127,13 +130,13 @@ export class FriendsService {
         status: FriendshipStatus.PENDING,
         OR: [
           { requesterId: currentUserId },
-          { addresseeId: currentUserId },
+          { recipientId: currentUserId },
         ],
       },
       orderBy: [{ createdAt: 'desc' }],
       include: {
         requester: { select: { id: true, email: true, name: true } },
-        addressee: { select: { id: true, email: true, name: true } },
+        recipient: { select: { id: true, email: true, name: true } },
       },
     });
 
@@ -144,9 +147,9 @@ export class FriendsService {
         friendshipId: row.id,
         createdAt: row.createdAt,
         requester: row.requester,
-        addressee: row.addressee,
+        recipient: row.recipient,
       };
-      if (row.addresseeId === currentUserId) {
+      if (row.recipientId === currentUserId) {
         incoming.push(payload);
       } else {
         outgoing.push(payload);
@@ -172,8 +175,8 @@ export class FriendsService {
     const existing = await this.prisma.friendship.findFirst({
       where: {
         OR: [
-          { requesterId: currentUserId, addresseeId: targetUserId },
-          { requesterId: targetUserId, addresseeId: currentUserId },
+          { requesterId: currentUserId, recipientId: targetUserId },
+          { requesterId: targetUserId, recipientId: currentUserId },
         ],
       },
     });
@@ -194,9 +197,8 @@ export class FriendsService {
         where: { id: existing.id },
         data: {
           requesterId: currentUserId,
-          addresseeId: targetUserId,
+          recipientId: targetUserId,
           status: FriendshipStatus.PENDING,
-          respondedAt: null,
         },
       });
     }
@@ -204,7 +206,7 @@ export class FriendsService {
     return this.prisma.friendship.create({
       data: {
         requesterId: currentUserId,
-        addresseeId: targetUserId,
+        recipientId: targetUserId,
       },
     });
   }
@@ -220,7 +222,7 @@ export class FriendsService {
     if (!friendship) {
       throw new NotFoundException('Verzoek niet gevonden');
     }
-    if (friendship.addresseeId !== currentUserId) {
+    if (friendship.recipientId !== currentUserId) {
       throw new BadRequestException('Je kunt dit verzoek niet wijzigen');
     }
     if (friendship.status !== FriendshipStatus.PENDING) {
@@ -230,13 +232,12 @@ export class FriendsService {
     const status =
       action === 'accept'
         ? FriendshipStatus.ACCEPTED
-        : FriendshipStatus.DECLINED;
+        : FriendshipStatus.REJECTED;
 
     return this.prisma.friendship.update({
       where: { id: friendshipId },
       data: {
         status,
-        respondedAt: new Date(),
       },
     });
   }
@@ -246,8 +247,8 @@ export class FriendsService {
       where: {
         status: FriendshipStatus.ACCEPTED,
         OR: [
-          { requesterId: currentUserId, addresseeId: otherUserId },
-          { requesterId: otherUserId, addresseeId: currentUserId },
+          { requesterId: currentUserId, recipientId: otherUserId },
+          { requesterId: otherUserId, recipientId: currentUserId },
         ],
       },
     });
@@ -256,7 +257,7 @@ export class FriendsService {
 
   private mapStatus(
     currentUserId: string,
-    row: { requesterId: string; addresseeId: string; status: FriendshipStatus },
+    row: { requesterId: string; recipientId: string; status: FriendshipStatus },
   ): RelationshipState {
     if (row.status === FriendshipStatus.ACCEPTED) {
       return 'FRIEND';

@@ -30,6 +30,18 @@ async function bootstrap() {
   const jwt = app.get(JwtService);
   const vendorBaseUrl =
     process.env.VENDOR_PORTAL_BASE_URL || 'https://hapke-backend.onrender.com';
+  const cookieDomain = process.env.COOKIE_DOMAIN?.trim() || undefined;
+  const cookieSecure =
+    (process.env.COOKIE_SECURE ?? 'true').toLowerCase() !== 'false';
+  const cookieSameSite = resolveSameSite(process.env.COOKIE_SAME_SITE);
+  const vendorCookieOptions = {
+    httpOnly: true,
+    secure: cookieSecure,
+    sameSite: cookieSameSite,
+    domain: cookieDomain,
+    path: '/vendor',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  } as const;
 
   // Login form
   server.get('/vendor/login', (_req: Request, res: Response) => {
@@ -122,9 +134,15 @@ async function bootstrap() {
         restaurantId: vendor.id,
       });
 
-      return res.json({ token });
+      res.cookie('vendor_token', token, vendorCookieOptions);
+      return res.json({ result: 'ok' });
     },
   );
+
+  server.post('/vendor/logout', (_req: Request, res: Response) => {
+    res.cookie('vendor_token', '', { ...vendorCookieOptions, maxAge: 0 });
+    return res.json({ result: 'logged_out' });
+  });
 
   // Vendor orders portal (client-rendered dashboard)
   server.get('/vendor', (_req: Request, res: Response) => {
@@ -326,4 +344,11 @@ function ensureExpressServer(instance: unknown): asserts instance is Express {
   if (!instance || typeof (instance as Partial<Express>).get !== 'function') {
     throw new Error('HTTP adapter must be an Express server');
   }
+}
+
+function resolveSameSite(value: string | undefined): 'lax' | 'strict' | 'none' {
+  const candidate = (value ?? 'lax').toLowerCase();
+  return candidate === 'strict' || candidate === 'none' || candidate === 'lax'
+    ? candidate
+    : 'lax';
 }

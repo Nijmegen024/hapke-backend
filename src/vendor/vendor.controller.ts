@@ -42,7 +42,6 @@ export class VendorController {
     const token = await this.jwt.signAsync({
       sub: email,
       role: 'vendor',
-      restaurantId: 'r1',
     });
     return { token };
   }
@@ -111,7 +110,14 @@ export class VendorController {
 
   private decode(req: Request): VendorJwtPayload {
     const auth = req.get('authorization') ?? '';
-    const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+    let token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+    if (!token) {
+      const cookies = (req as Request & { cookies?: unknown }).cookies;
+      if (cookies && typeof cookies === 'object' && 'vendor_token' in cookies) {
+        const candidate = (cookies as Record<string, unknown>).vendor_token;
+        token = typeof candidate === 'string' ? candidate : null;
+      }
+    }
     if (!token) throw new UnauthorizedException('Geen token');
     const payload = this.decodeJwt(token);
     if (!payload || typeof payload !== 'object')

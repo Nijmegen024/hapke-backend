@@ -3,14 +3,14 @@ import { AppController, RestaurantsController } from './app.controller';
 import { AppService } from './app.service';
 import { HealthController } from './health.controller';
 import { PrismaModule } from './prisma/prisma.module';
-import { ChatsService } from './chats/chats.service';
-import { ChatsController } from './chats/chats.controller';
 import { AuthModule } from './auth/auth.module';
 import { PaymentsModule } from './payments/payments.module';
 import { OrdersModule } from './orders/orders.module';
 import { MailModule } from './mail/mail.module';
 import { VendorModule } from './vendor/vendor.module';
 import { UsersModule } from './users/users.module';
+import { ChatsModule } from './chats/chats.module';
+import { FriendsModule } from './friends/friends.module';
 
 @Module({
   imports: [
@@ -21,13 +21,14 @@ import { UsersModule } from './users/users.module';
     VendorModule,
     MailModule,
     UsersModule,
+    ChatsModule,
+    FriendsModule,
   ],
   controllers: [
     AppController,
     RestaurantsController,
     HealthController,
-    ChatsController,
   ],
-  providers: [AppService, ChatsService],
+  providers: [AppService],
 })
 export class AppModule {}

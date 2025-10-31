@@ -157,6 +157,35 @@ export class OrdersService {
     };
   }
 
+  async listUserOrders(userId: string | undefined) {
+    if (!userId) {
+      throw new BadRequestException('Gebruiker niet bekend');
+    }
+    const orders = await this.prisma.order.findMany({
+      where: { userId },
+      include: { items: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return orders.map((order) => ({
+      orderId: order.orderNumber,
+      status: order.status,
+      total: Number(order.total),
+      createdAt: order.createdAt.toISOString(),
+      etaMinutes: this.calculateEta(order),
+      items: order.items.map((item) => ({
+        id: item.itemId,
+        name: item.name,
+        qty: item.qty,
+        price: Number(item.price),
+      })),
+      steps: this.mapSteps(order).map((step) => ({
+        name: step.name,
+        at: step.at ? step.at.toISOString() : null,
+      })),
+    }));
+  }
+
   private calculateEta(order: {
     receivedAt: Date;
     deliveredAt: Date | null;

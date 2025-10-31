@@ -1,4 +1,6 @@
+import { IsString } from 'class-validator';
+
 export class SendMessageDto {
-  senderId: string;
-  content: string;
+  @IsString()
+  content!: string;
 }

@@ -29,6 +29,12 @@ export class OrdersController {
     return this.orders.createOrder(userId, dto);
   }
 
+  @Get('history')
+  async history(@Req() req: AuthenticatedRequest) {
+    const userId = req.user?.sub ?? req.user?.id;
+    return this.orders.listUserOrders(userId);
+  }
+
   @Get(':orderId/status')
   async status(
     @Param('orderId') orderId: string,

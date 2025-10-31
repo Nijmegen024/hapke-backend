@@ -8,50 +8,72 @@ datasource db {
 }
 
 model User {
-  id             String         @id @default(cuid())
-  email          String         @unique
-  role           String?        @default("CUSTOMER")
-  name           String?
-  passwordHash   String
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  id           String   @id @default(cuid())
+  email        String   @unique
+  role         String?  @default("CUSTOMER")
+  name         String?
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  chats          Chat[]         @relation("Participants")
-  messages       Message[]
-  refreshTokens  RefreshToken[]
-  orders         Order[]
-  addresses      Address[]
+  chats                Chat[]         @relation("Participants")
+  messages             Message[]
+  refreshTokens        RefreshToken[]
+  orders               Order[]
+  addresses            Address[]
+  friendshipsRequested Friendship[]   @relation("FriendshipsRequested")
+  friendshipsReceived  Friendship[]   @relation("FriendshipsReceived")
 }
 
 model Chat {
-  id         String    @id @default(cuid())
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Deelnemers (veel-op-veel)
-  participants User[]  @relation("Participants")
+  participants User[]    @relation("Participants")
   messages     Message[]
 }
 
 model Message {
-  id        String   @id @default(cuid())
-  chat      Chat     @relation(fields: [chatId], references: [id])
-  chatId    String
-  sender    User     @relation(fields: [senderId], references: [id])
-  senderId  String
+  id       String @id @default(cuid())
+  chat     Chat   @relation(fields: [chatId], references: [id])
+  chatId   String
+  sender   User   @relation(fields: [senderId], references: [id])
+  senderId String
 
   content   String
   createdAt DateTime @default(now())
 }
 
+model Friendship {
+  id          String           @id @default(cuid())
+  requester   User             @relation("FriendshipsRequested", fields: [requesterId], references: [id])
+  requesterId String
+  recipient   User             @relation("FriendshipsReceived", fields: [recipientId], references: [id])
+  recipientId String
+  status      FriendshipStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([requesterId, recipientId])
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  BLOCKED
+}
+
 model RefreshToken {
-  id         String   @id @default(cuid())
-  user       User     @relation(fields: [userId], references: [id])
-  userId     String
-  tokenHash  String   @unique
-  expiresAt  DateTime
-  createdAt  DateTime @default(now())
-  revokedAt  DateTime?
+  id        String    @id @default(cuid())
+  user      User      @relation(fields: [userId], references: [id])
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
 
   @@index([userId])
 }
@@ -64,21 +86,21 @@ enum OrderStatus {
 }
 
 model Order {
-  id           String       @id @default(cuid())
-  orderNumber  String       @unique
-  user         User         @relation(fields: [userId], references: [id])
-  userId       String
-  paymentId    String
-  total        Decimal      @db.Decimal(10, 2)
-  status       OrderStatus  @default(RECEIVED)
-  receivedAt   DateTime     @default(now())
-  preparingAt  DateTime?
-  onTheWayAt   DateTime?
-  deliveredAt  DateTime?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  id          String      @id @default(cuid())
+  orderNumber String      @unique
+  user        User        @relation(fields: [userId], references: [id])
+  userId      String
+  paymentId   String
+  total       Decimal     @db.Decimal(10, 2)
+  status      OrderStatus @default(RECEIVED)
+  receivedAt  DateTime    @default(now())
+  preparingAt DateTime?
+  onTheWayAt  DateTime?
+  deliveredAt DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 
-  items        OrderItem[]
+  items OrderItem[]
 
   vendorId String?
   vendor   Vendor? @relation(fields: [vendorId], references: [id])
@@ -87,14 +109,15 @@ model Order {
 }
 
 model OrderItem {
-  id        String  @id @default(cuid())
-  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  orderId   String
-  itemId    String
-  name      String
-  qty       Int
-  price     Decimal @db.Decimal(10, 2)
+  id      String  @id @default(cuid())
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId String
+  itemId  String
+  name    String
+  qty     Int
+  price   Decimal @db.Decimal(10, 2)
 }
+
 model Vendor {
   id        String   @id @default(cuid())
   email     String   @unique

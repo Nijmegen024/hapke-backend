@@ -1,29 +1,69 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import type { Request } from 'express';
 import { ChatsService } from './chats.service';
 import { CreateChatDto } from './dto/create-chat.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 
-@Controller()
+interface AuthenticatedRequest extends Request {
+  user?: { id?: string };
+}
+
+@UseGuards(AuthGuard('jwt'))
+@Controller('chats')
 export class ChatsController {
   constructor(private readonly chatsService: ChatsService) {}
 
-  @Post('chats')
-  create(@Body() dto: CreateChatDto) {
-    return this.chatsService.createChat(dto);
-  }
-
-  @Post('chats/:chatId/messages')
-  addMessage(@Param('chatId') chatId: string, @Body() dto: SendMessageDto) {
-    return this.chatsService.addMessage(chatId, dto);
-  }
-
-  @Get('chats/:chatId')
-  getChat(@Param('chatId') chatId: string) {
-    return this.chatsService.getChat(chatId);
-  }
-
-  @Get('users/:userId/chats')
-  listChatsForUser(@Param('userId') userId: string) {
+  @Get()
+  list(@Req() req: AuthenticatedRequest) {
+    const userId = req.user?.id;
+    if (!userId) return [];
     return this.chatsService.listChatsForUser(userId);
+  }
+
+  @Post()
+  create(@Req() req: AuthenticatedRequest, @Body() dto: CreateChatDto) {
+    const userId = req.user?.id;
+    if (!userId) return;
+    return this.chatsService.createChat(userId, dto);
+  }
+
+  @Post('direct/:userId')
+  getOrCreateDirectChat(
+    @Req() req: AuthenticatedRequest,
+    @Param('userId') userId: string,
+  ) {
+    const currentUserId = req.user?.id;
+    if (!currentUserId) return;
+    return this.chatsService.getOrCreateDirectChat(currentUserId, userId);
+  }
+
+  @Get(':chatId')
+  getChat(
+    @Req() req: AuthenticatedRequest,
+    @Param('chatId') chatId: string,
+  ) {
+    const userId = req.user?.id;
+    if (!userId) return;
+    return this.chatsService.getChatForUser(userId, chatId);
+  }
+
+  @Post(':chatId/messages')
+  addMessage(
+    @Req() req: AuthenticatedRequest,
+    @Param('chatId') chatId: string,
+    @Body() dto: SendMessageDto,
+  ) {
+    const userId = req.user?.id;
+    if (!userId) return;
+    return this.chatsService.addMessage(chatId, userId, dto.content);
   }
 }
