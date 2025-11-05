@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   HttpCode,
+  Param,
   Post,
   Req,
   Res,
@@ -61,6 +62,18 @@ export class AuthController {
     await this.authService.logout(refreshToken);
     this.authService.clearRefreshCookie(res);
     return;
+  }
+
+  @Post('verify/:token')
+  async verify(@Param('token') token: string) {
+    const result = await this.authService.verifyEmailToken(token);
+    return {
+      message: result.alreadyVerified
+        ? 'Account was al geactiveerd'
+        : 'Je account is geactiveerd!',
+      alreadyVerified: result.alreadyVerified,
+      user: result.user,
+    };
   }
 
   @Get('me')

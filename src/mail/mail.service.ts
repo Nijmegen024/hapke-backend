@@ -32,13 +32,14 @@ export class MailService {
     });
   }
 
-  async sendMail(to: string, subject: string, text: string) {
+  async sendMail(to: string, subject: string, text: string, html?: string) {
     try {
       const info = (await this.transporter.sendMail({
         from: this.defaultFrom,
         to,
         subject,
         text,
+        html,
       })) as unknown;
       const messageId = extractMessageId(info);
 

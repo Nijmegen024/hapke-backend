@@ -11,6 +11,7 @@ import type { Request, Response } from 'express';
 
 import type { Address, User } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
@@ -38,10 +39,14 @@ export class AuthService {
   private readonly cookieSameSite = this.resolveSameSite(
     process.env.COOKIE_SAME_SITE,
   );
+  private readonly verificationUrlBase = this.resolveVerificationBase(
+    process.env.VERIFICATION_URL_BASE,
+  );
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly mailService: MailService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -54,14 +59,19 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
+    const verificationToken = this.generateVerificationToken();
+
     const user = await this.prisma.user.create({
       data: {
         email,
         passwordHash,
+        verificationToken,
       },
     });
 
-    return { user: this.mapUser(user) };
+    await this.sendVerificationEmail(user, verificationToken);
+
+    return { user: this.mapUser(user), requiresVerification: true };
   }
 
   async login(dto: LoginDto) {
@@ -74,6 +84,11 @@ export class AuthService {
           `Login mislukte voor ${email}: gebruiker niet gevonden`,
         );
         throw new UnauthorizedException('Ongeldige inlog');
+      }
+
+      if (!user.isVerified) {
+        this.logger.warn(`Login geweigerd voor ${email}: account niet actief`);
+        throw new UnauthorizedException('Account nog niet geactiveerd');
       }
 
       const passwordMatch = await bcrypt.compare(
@@ -155,6 +170,44 @@ export class AuthService {
     });
   }
 
+  async verifyEmailToken(token: string) {
+    const trimmed = token.trim();
+    if (!trimmed) {
+      throw new BadRequestException('Ongeldig verificatietoken');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { verificationToken: trimmed },
+    });
+
+    if (!user) {
+      throw new BadRequestException(
+        'Dit verificatietoken is ongeldig of is al gebruikt',
+      );
+    }
+
+    if (user.isVerified) {
+      if (user.verificationToken) {
+        const updated = await this.prisma.user.update({
+          where: { id: user.id },
+          data: { verificationToken: null },
+        });
+        return { user: this.mapUser(updated), alreadyVerified: true };
+      }
+      return { user: this.mapUser(user), alreadyVerified: true };
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        isVerified: true,
+        verificationToken: null,
+      },
+    });
+
+    return { user: this.mapUser(updated), alreadyVerified: false };
+  }
+
   async getUserById(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
@@ -215,6 +268,7 @@ export class AuthService {
       id: user.id,
       email: user.email,
       name: user.name,
+      isVerified: user.isVerified,
       createdAt: user.createdAt,
     };
 
@@ -245,6 +299,53 @@ export class AuthService {
 
   private generateRefreshToken(): string {
     return randomBytes(48).toString('hex');
+  }
+
+  private generateVerificationToken(): string {
+    return randomBytes(32).toString('hex');
+  }
+
+  private async sendVerificationEmail(user: User, token: string) {
+    const link = `${this.verificationUrlBase}/${token}`;
+    const text = [
+      'Welkom bij Hapke!',
+      '',
+      'Klik op de onderstaande link om je account te activeren:',
+      link,
+      '',
+      'Als je deze aanvraag niet hebt gedaan, kun je deze e-mail negeren.',
+    ].join('\n');
+    const html = [
+      '<p>Welkom bij Hapke! Klik hieronder om je account te activeren.</p>',
+      `<p><a href="${link}" style="display:inline-block;padding:12px 24px;background-color:#E53935;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold;">Activeer je account</a></p>`,
+      '<p>Werkt de knop niet? Kopieer dan deze link in je browser:</p>',
+      `<p><a href="${link}">${link}</a></p>`,
+    ].join('');
+
+    try {
+      const result = await this.mailService.sendMail(
+        user.email,
+        'Activeer je Hapke-account',
+        text,
+        html,
+      );
+      if (!result.ok) {
+        this.logger.warn(
+          `Verificatie-mail verzenden mislukt voor ${user.email}: ${result.error}`,
+        );
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `Verificatie-mail verzenden gooide een fout voor ${user.email}: ${message}`,
+      );
+    }
+  }
+
+  private resolveVerificationBase(value: string | undefined) {
+    const fallback = 'https://hapke-frontend.onrender.com/verify';
+    const base = (value ?? fallback).trim() || fallback;
+    return base.replace(/\/+$/, '');
   }
 
   private hashRefreshToken(token: string): string {

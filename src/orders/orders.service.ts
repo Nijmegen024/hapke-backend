@@ -52,12 +52,28 @@ export class OrdersService {
     const orderNumber = `ORD-${Date.now()}`;
     const receivedAt = new Date();
 
-    const demoVendorId = (process.env.DEMO_VENDOR_ID || '').trim();
-    if (!demoVendorId) {
+    const requestedVendorId = dto.restaurantId?.trim();
+    let vendorId =
+      requestedVendorId && requestedVendorId.length > 0
+        ? requestedVendorId
+        : undefined;
+    if (!vendorId) {
+      const fallback = (process.env.DEMO_VENDOR_ID || '').trim();
+      vendorId = fallback.length > 0 ? fallback : undefined;
+    }
+    if (!vendorId) {
       this.logger.error(
-        'DEMO_VENDOR_ID ontbreekt - order kan niet worden gekoppeld.',
+        'Geen vendorId opgegeven en DEMO_VENDOR_ID ontbreekt.',
       );
       throw new InternalServerErrorException('Vendor configuratie ontbreekt');
+    }
+
+    const vendorExists = await this.prisma.vendor.findUnique({
+      where: { id: vendorId },
+    });
+
+    if (!vendorExists) {
+      throw new BadRequestException('Restaurant niet gevonden');
     }
 
     const order = await this.prisma.order.create({
@@ -68,7 +84,7 @@ export class OrdersService {
         total: new Prisma.Decimal(total.toFixed(2)),
         status: OrderStatus.RECEIVED,
         receivedAt,
-        vendorId: demoVendorId,
+        vendorId,
         items: {
           create: normalized.map((item) => ({
             itemId: item.id,

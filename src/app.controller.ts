@@ -1,5 +1,6 @@
 import { Controller, Get, Param } from '@nestjs/common';
 import { AppService } from './app.service';
+import { PrismaService } from './prisma/prisma.service';
 
 @Controller()
 export class AppController {
@@ -18,9 +19,11 @@ export class AppController {
 
 @Controller('restaurants')
 export class RestaurantsController {
+  constructor(private readonly prisma: PrismaService) {}
+
   @Get()
-  list() {
-    return [
+  async list() {
+    const staticRestaurants = [
       {
         id: 'r1',
         name: 'Pizzeria Napoli',
@@ -38,6 +41,25 @@ export class RestaurantsController {
         deliveryCost: 1.5,
       },
     ];
+
+    const vendors = await this.prisma.vendor.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const vendorRestaurants = vendors.map((vendor) => ({
+      id: vendor.id,
+      name: vendor.name,
+      cuisine: vendor.description
+        ? vendor.description
+        : 'Beschrijving nog in te vullen',
+      rating: vendor.isActive ? 4.5 : 0,
+      minOrder: 20,
+      deliveryCost: 0,
+      city: vendor.city,
+      isActive: vendor.isActive,
+    }));
+
+    return [...staticRestaurants, ...vendorRestaurants];
   }
 
   @Get(':id/menu')

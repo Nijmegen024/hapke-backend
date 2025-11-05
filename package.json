@@ -12,7 +12,7 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main.js",
+    "start:prod": "node dist/src/main.js",
     "prisma:migrate": "prisma migrate deploy",
     "prisma:seed": "npx ts-node prisma/seed.ts",
     "prisma": "prisma",

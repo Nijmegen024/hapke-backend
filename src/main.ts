@@ -1,11 +1,10 @@
 import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { PrismaService } from './prisma/prisma.service';
-import { JwtService } from '@nestjs/jwt';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import type { Express, Request, Response } from 'express';
+import { VendorService } from './vendor/vendor.service';
 
 type VendorLoginBody = {
   email?: string;
@@ -26,22 +25,9 @@ async function bootstrap() {
   const server = app.getHttpAdapter().getInstance();
   ensureExpressServer(server);
   // --- Simple Vendor Portal (Demo) ---
-  const prisma = app.get(PrismaService);
-  const jwt = app.get(JwtService);
+  const vendorService = app.get(VendorService);
   const vendorBaseUrl =
     process.env.VENDOR_PORTAL_BASE_URL || 'https://hapke-backend.onrender.com';
-  const cookieDomain = process.env.COOKIE_DOMAIN?.trim() || undefined;
-  const cookieSecure =
-    (process.env.COOKIE_SECURE ?? 'true').toLowerCase() !== 'false';
-  const cookieSameSite = resolveSameSite(process.env.COOKIE_SAME_SITE);
-  const vendorCookieOptions = {
-    httpOnly: true,
-    secure: cookieSecure,
-    sameSite: cookieSameSite,
-    domain: cookieDomain,
-    path: '/vendor',
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  } as const;
 
   // Login form
   server.get('/vendor/login', (_req: Request, res: Response) => {
@@ -120,27 +106,28 @@ async function bootstrap() {
         return res.status(400).send('Missing email or password');
       }
 
-      const vendor = await prisma.vendor.findUnique({ where: { email } });
-      if (!vendor) return res.status(401).send('Invalid credentials');
-
-      // For demo: compare plain text (you can hash later)
-      if (vendor.password !== password) {
-        return res.status(401).send('Invalid credentials');
+      try {
+        const vendor = await vendorService.validateCredentials({
+          email,
+          password,
+        });
+        const token = await vendorService.signToken(vendor);
+        vendorService.applyAuthCookie(res, token);
+        return res.json({
+          result: 'ok',
+          token,
+          vendor: vendorService.toSafeVendor(vendor),
+        });
+      } catch (error) {
+        const status =
+          (error as { status?: number }).status === 400 ? 400 : 401;
+        return res.status(status).send('Invalid credentials');
       }
-
-      const token = await jwt.signAsync({
-        sub: email,
-        role: 'vendor',
-        restaurantId: vendor.id,
-      });
-
-      res.cookie('vendor_token', token, vendorCookieOptions);
-      return res.json({ result: 'ok' });
     },
   );
 
   server.post('/vendor/logout', (_req: Request, res: Response) => {
-    res.cookie('vendor_token', '', { ...vendorCookieOptions, maxAge: 0 });
+    vendorService.clearAuthCookie(res);
     return res.json({ result: 'logged_out' });
   });
 
@@ -344,11 +331,4 @@ function ensureExpressServer(instance: unknown): asserts instance is Express {
   if (!instance || typeof (instance as Partial<Express>).get !== 'function') {
     throw new Error('HTTP adapter must be an Express server');
   }
-}
-
-function resolveSameSite(value: string | undefined): 'lax' | 'strict' | 'none' {
-  const candidate = (value ?? 'lax').toLowerCase();
-  return candidate === 'strict' || candidate === 'none' || candidate === 'lax'
-    ? candidate
-    : 'lax';
 }

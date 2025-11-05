@@ -2,58 +2,82 @@ import {
   Body,
   Controller,
   Get,
-  Patch,
-  Post,
-  Param,
-  UnauthorizedException,
-  Req,
+  HttpCode,
   HttpException,
   HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Req,
+  Res,
 } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { PrismaService } from '../prisma/prisma.service';
 import { OrderStatus } from '@prisma/client';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 
-type VendorLoginBody = {
-  email?: string;
-  password?: string;
-};
-
-type VendorJwtPayload = {
-  sub: string;
-  role: string;
-  restaurantId?: string;
-};
+import { PrismaService } from '../prisma/prisma.service';
+import { VendorService } from './vendor.service';
+import { RegisterVendorDto } from './dto/register-vendor.dto';
+import { LoginVendorDto } from './dto/login-vendor.dto';
 
 @Controller('vendor')
 export class VendorController {
   constructor(
-    private jwt: JwtService,
-    private prisma: PrismaService,
+    private readonly prisma: PrismaService,
+    private readonly vendors: VendorService,
   ) {}
 
+  @Post('register')
+  async register(
+    @Body() dto: RegisterVendorDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const vendor = await this.vendors.register(dto);
+    const token = await this.vendors.signToken(vendor);
+    this.vendors.applyAuthCookie(res, token);
+    return {
+      message: 'Bedrijf aangemaakt',
+      token,
+      vendor: this.vendors.toSafeVendor(vendor),
+    };
+  }
+
   @Post('login')
-  async login(@Body() body: VendorLoginBody) {
-    const email = body.email?.trim();
-    const password = body.password?.trim();
-    if (!email || !password)
-      throw new UnauthorizedException('Email en wachtwoord verplicht');
-    const token = await this.jwt.signAsync({
-      sub: email,
-      role: 'vendor',
-    });
-    return { token };
+  async login(
+    @Body() dto: LoginVendorDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const vendor = await this.vendors.validateCredentials(dto);
+    const token = await this.vendors.signToken(vendor);
+    this.vendors.applyAuthCookie(res, token);
+    return {
+      message: 'Ingelogd',
+      token,
+      vendor: this.vendors.toSafeVendor(vendor),
+    };
+  }
+
+  @Post('logout')
+  @HttpCode(204)
+  async logout(@Res({ passthrough: true }) res: Response) {
+    this.vendors.clearAuthCookie(res);
+  }
+
+  @Get('me')
+  async me(@Req() req: Request) {
+    const vendor = await this.vendors.authenticateRequest(req);
+    return { vendor: this.vendors.toSafeVendor(vendor) };
   }
 
   @Get('orders')
   async getOrders(@Req() req: Request) {
-    this.decode(req);
-    return this.prisma.order.findMany({
+    const vendor = await this.vendors.authenticateRequest(req);
+    const orders = await this.prisma.order.findMany({
+      where: { vendorId: vendor.id },
       include: { items: true },
       orderBy: { receivedAt: 'desc' },
       take: 50,
     });
+    return orders;
   }
 
   @Patch('orders/:id/status')
@@ -62,12 +86,13 @@ export class VendorController {
     @Param('id') id: string,
     @Body('status') status: string,
   ) {
-    this.decode(req);
-    if (!status)
+    const vendor = await this.vendors.authenticateRequest(req);
+    if (!status) {
       throw new HttpException(
         { result: 'blocked', reason: 'status_missing' },
         HttpStatus.BAD_REQUEST,
       );
+    }
     if (!Object.values(OrderStatus).includes(status as OrderStatus)) {
       throw new HttpException(
         { result: 'blocked', reason: 'status_invalid' },
@@ -75,13 +100,16 @@ export class VendorController {
       );
     }
 
-    const order = await this.prisma.order.findUnique({ where: { id } });
-    if (!order) {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+    });
+    if (!order || order.vendorId !== vendor.id) {
       throw new HttpException(
         { result: 'blocked', reason: 'order_not_found' },
         HttpStatus.BAD_REQUEST,
       );
     }
+
     const nextStatus = status as OrderStatus;
 
     const statusFlow = [
@@ -106,32 +134,5 @@ export class VendorController {
       data: { status: nextStatus },
     });
     return { result: 'updated' };
-  }
-
-  private decode(req: Request): VendorJwtPayload {
-    const auth = req.get('authorization') ?? '';
-    let token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
-    if (!token) {
-      const cookies = (req as Request & { cookies?: unknown }).cookies;
-      if (cookies && typeof cookies === 'object' && 'vendor_token' in cookies) {
-        const candidate = (cookies as Record<string, unknown>).vendor_token;
-        token = typeof candidate === 'string' ? candidate : null;
-      }
-    }
-    if (!token) throw new UnauthorizedException('Geen token');
-    const payload = this.decodeJwt(token);
-    if (!payload || typeof payload !== 'object')
-      throw new UnauthorizedException('Token ongeldig');
-    const vendorPayload = payload as Partial<VendorJwtPayload>;
-    if (
-      vendorPayload.role !== 'vendor' ||
-      typeof vendorPayload.sub !== 'string'
-    )
-      throw new UnauthorizedException('Token ongeldig');
-    return vendorPayload as VendorJwtPayload;
-  }
-
-  private decodeJwt(token: string): unknown {
-    return this.jwt.decode(token);
   }
 }
