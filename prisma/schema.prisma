@@ -30,7 +30,7 @@ model User {
 model Chat {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 
   // Deelnemers (veel-op-veel)
   participants User[]    @relation("Participants")
@@ -132,8 +132,19 @@ model Vendor {
   city         String?
   description  String?
   isActive     Boolean  @default(false)
-  orders    Order[]
-  createdAt DateTime @default(now())
+  heroImageUrl String?
+  logoImageUrl String?
+  minOrder    Decimal? @db.Decimal(10, 2)
+  deliveryFee Decimal? @db.Decimal(10, 2)
+  etaDisplay  String?
+  cuisine     String?
+  category    String?
+  isFeatured  Boolean  @default(false)
+  orders      Order[]
+  menuCategories VendorMenuCategory[]
+  menuItems   VendorMenuItem[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
 }
 
 model Address {
@@ -151,4 +162,38 @@ model Address {
   updatedAt   DateTime @updatedAt
 
   @@index([userId, isPrimary])
+}
+model VendorMenuCategory {
+  id        String   @id @default(cuid())
+  vendor    Vendor   @relation(fields: [vendorId], references: [id])
+  vendorId  String
+  name      String
+  description String?
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  items VendorMenuItem[]
+
+  @@index([vendorId, position])
+}
+
+model VendorMenuItem {
+  id          String   @id @default(cuid())
+  vendor      Vendor   @relation(fields: [vendorId], references: [id])
+  vendorId    String
+  category    VendorMenuCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId  String?
+  name        String
+  description String?
+  price       Decimal  @db.Decimal(10, 2)
+  imageUrl    String?
+  isAvailable Boolean  @default(true)
+  isHighlighted Boolean @default(false)
+  position    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([vendorId, categoryId])
+  @@index([vendorId, position])
 }

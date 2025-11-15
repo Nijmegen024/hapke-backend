@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpException,
@@ -18,6 +19,15 @@ import { PrismaService } from '../prisma/prisma.service';
 import { VendorService } from './vendor.service';
 import { RegisterVendorDto } from './dto/register-vendor.dto';
 import { LoginVendorDto } from './dto/login-vendor.dto';
+import { UpdateVendorProfileDto } from './dto/update-vendor-profile.dto';
+import {
+  CreateMenuCategoryDto,
+  UpdateMenuCategoryDto,
+} from './dto/menu-category.dto';
+import {
+  CreateMenuItemDto,
+  UpdateMenuItemDto,
+} from './dto/menu-item.dto';
 
 @Controller('vendor')
 export class VendorController {
@@ -66,6 +76,78 @@ export class VendorController {
   async me(@Req() req: Request) {
     const vendor = await this.vendors.authenticateRequest(req);
     return { vendor: this.vendors.toSafeVendor(vendor) };
+  }
+
+  @Get('profile')
+  async profile(@Req() req: Request) {
+    const vendor = await this.vendors.authenticateRequest(req);
+    return this.vendors.getVendorDashboard(vendor.id);
+  }
+
+  @Patch('profile')
+  async updateProfile(
+    @Req() req: Request,
+    @Body() dto: UpdateVendorProfileDto,
+  ) {
+    const vendor = await this.vendors.authenticateRequest(req);
+    return this.vendors.updateVendorProfile(vendor.id, dto);
+  }
+
+  @Get('menu')
+  async menu(@Req() req: Request) {
+    const vendor = await this.vendors.authenticateRequest(req);
+    const dashboard = await this.vendors.getVendorDashboard(vendor.id);
+    return dashboard.menu;
+  }
+
+  @Post('menu/categories')
+  async createCategory(
+    @Req() req: Request,
+    @Body() dto: CreateMenuCategoryDto,
+  ) {
+    const vendor = await this.vendors.authenticateRequest(req);
+    return this.vendors.createCategory(vendor.id, dto);
+  }
+
+  @Patch('menu/categories/:id')
+  async updateCategory(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body() dto: UpdateMenuCategoryDto,
+  ) {
+    const vendor = await this.vendors.authenticateRequest(req);
+    return this.vendors.updateCategory(vendor.id, id, dto);
+  }
+
+  @Delete('menu/categories/:id')
+  async deleteCategory(@Req() req: Request, @Param('id') id: string) {
+    const vendor = await this.vendors.authenticateRequest(req);
+    return this.vendors.deleteCategory(vendor.id, id);
+  }
+
+  @Post('menu/items')
+  async createMenuItem(
+    @Req() req: Request,
+    @Body() dto: CreateMenuItemDto,
+  ) {
+    const vendor = await this.vendors.authenticateRequest(req);
+    return this.vendors.createMenuItem(vendor.id, dto);
+  }
+
+  @Patch('menu/items/:id')
+  async updateMenuItem(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body() dto: UpdateMenuItemDto,
+  ) {
+    const vendor = await this.vendors.authenticateRequest(req);
+    return this.vendors.updateMenuItem(vendor.id, id, dto);
+  }
+
+  @Delete('menu/items/:id')
+  async deleteMenuItem(@Req() req: Request, @Param('id') id: string) {
+    const vendor = await this.vendors.authenticateRequest(req);
+    return this.vendors.deleteMenuItem(vendor.id, id);
   }
 
   @Get('orders')

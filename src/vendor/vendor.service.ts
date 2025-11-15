@@ -8,10 +8,19 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import type { Request, Response } from 'express';
 
-import type { Vendor } from '@prisma/client';
+import type { Vendor, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterVendorDto } from './dto/register-vendor.dto';
 import { LoginVendorDto } from './dto/login-vendor.dto';
+import { UpdateVendorProfileDto } from './dto/update-vendor-profile.dto';
+import {
+  CreateMenuCategoryDto,
+  UpdateMenuCategoryDto,
+} from './dto/menu-category.dto';
+import {
+  CreateMenuItemDto,
+  UpdateMenuItemDto,
+} from './dto/menu-item.dto';
 
 type VendorTokenPayload = {
   sub: string;
@@ -20,6 +29,10 @@ type VendorTokenPayload = {
 };
 
 type SafeVendor = Omit<Vendor, 'passwordHash'>;
+type CategoryWithItems = Prisma.VendorMenuCategoryGetPayload<{
+  include: { items: true };
+}>;
+type MenuItemEntity = Prisma.VendorMenuItemGetPayload<{}>;
 
 @Injectable()
 export class VendorService {
@@ -146,10 +159,263 @@ export class VendorService {
     res.cookie(this.cookieName, '', { ...this.cookieOptions, maxAge: 0 });
   }
 
+  async getVendorDashboard(vendorId: string) {
+    const vendor = await this.prisma.vendor.findUnique({
+      where: { id: vendorId },
+    });
+    if (!vendor) {
+      throw new UnauthorizedException('Vendor niet gevonden');
+    }
+    const categories = await this.prisma.vendorMenuCategory.findMany({
+      where: { vendorId },
+      orderBy: { position: 'asc' },
+      include: { items: { orderBy: { position: 'asc' } } },
+    });
+    const uncategorized = await this.prisma.vendorMenuItem.findMany({
+      where: { vendorId, categoryId: null },
+      orderBy: { position: 'asc' },
+    });
+    return {
+      vendor: this.mapVendorProfile(vendor),
+      menu: {
+        categories: categories.map((category) =>
+          this.mapCategoryWithItems(category),
+        ),
+        uncategorized: uncategorized.map((item) => this.mapMenuItem(item)),
+      },
+    };
+  }
+
+  async updateVendorProfile(vendorId: string, dto: UpdateVendorProfileDto) {
+    const vendor = await this.prisma.vendor.update({
+      where: { id: vendorId },
+      data: {
+        name: this.normalizeString(dto.name) ?? undefined,
+        contactName: this.normalizeString(dto.contactName),
+        phone: this.normalizeString(dto.phone),
+        street: this.normalizeString(dto.street),
+        postalCode: this.normalizeString(dto.postalCode),
+        city: this.normalizeString(dto.city),
+        description: this.normalizeString(dto.description),
+        heroImageUrl: this.normalizeString(dto.heroImageUrl),
+        logoImageUrl: this.normalizeString(dto.logoImageUrl),
+        minOrder:
+          dto.minOrder === undefined ? undefined : Number(dto.minOrder),
+        deliveryFee:
+          dto.deliveryFee === undefined ? undefined : Number(dto.deliveryFee),
+        etaDisplay: this.normalizeString(dto.etaDisplay),
+        cuisine: this.normalizeString(dto.cuisine),
+        category: this.normalizeString(dto.category),
+        isActive: dto.isActive ?? undefined,
+        isFeatured: dto.isFeatured ?? undefined,
+      },
+    });
+    return this.mapVendorProfile(vendor);
+  }
+
+  async createCategory(vendorId: string, dto: CreateMenuCategoryDto) {
+    const category = await this.prisma.vendorMenuCategory.create({
+      data: {
+        vendorId,
+        name: dto.name.trim(),
+        description: this.normalizeString(dto.description),
+        position: dto.position ?? 0,
+      },
+      include: { items: true },
+    });
+    return this.mapCategoryWithItems(category);
+  }
+
+  async updateCategory(
+    vendorId: string,
+    categoryId: string,
+    dto: UpdateMenuCategoryDto,
+  ) {
+    const existing = await this.prisma.vendorMenuCategory.findFirst({
+      where: { id: categoryId, vendorId },
+      include: { items: true },
+    });
+    if (!existing) {
+      throw new BadRequestException('Categorie niet gevonden');
+    }
+    const updated = await this.prisma.vendorMenuCategory.update({
+      where: { id: categoryId },
+      data: {
+        name: dto.name?.trim(),
+        description: this.normalizeString(dto.description),
+        position: dto.position ?? existing.position,
+      },
+      include: { items: { orderBy: { position: 'asc' } } },
+    });
+    return this.mapCategoryWithItems(updated);
+  }
+
+  async deleteCategory(vendorId: string, categoryId: string) {
+    const existing = await this.prisma.vendorMenuCategory.findFirst({
+      where: { id: categoryId, vendorId },
+    });
+    if (!existing) {
+      throw new BadRequestException('Categorie niet gevonden');
+    }
+    await this.prisma.vendorMenuCategory.delete({ where: { id: categoryId } });
+    return { ok: true };
+  }
+
+  async createMenuItem(vendorId: string, dto: CreateMenuItemDto) {
+    if (dto.categoryId) {
+      const category = await this.prisma.vendorMenuCategory.findFirst({
+        where: { id: dto.categoryId, vendorId },
+      });
+      if (!category) {
+        throw new BadRequestException('Categorie niet gevonden');
+      }
+    }
+    const item = await this.prisma.vendorMenuItem.create({
+      data: {
+        vendorId,
+        categoryId: dto.categoryId ?? null,
+        name: dto.name.trim(),
+        description: this.normalizeString(dto.description),
+        price: dto.price,
+        imageUrl: this.normalizeString(dto.imageUrl),
+        isAvailable: dto.isAvailable ?? true,
+        isHighlighted: dto.isHighlighted ?? false,
+        position: dto.position ?? 0,
+      },
+    });
+    return this.mapMenuItem(item);
+  }
+
+  async updateMenuItem(
+    vendorId: string,
+    itemId: string,
+    dto: UpdateMenuItemDto,
+  ) {
+    const existing = await this.prisma.vendorMenuItem.findFirst({
+      where: { id: itemId, vendorId },
+    });
+    if (!existing) {
+      throw new BadRequestException('Menu item niet gevonden');
+    }
+    if (dto.categoryId) {
+      const category = await this.prisma.vendorMenuCategory.findFirst({
+        where: { id: dto.categoryId, vendorId },
+      });
+      if (!category) {
+        throw new BadRequestException('Categorie niet gevonden');
+      }
+    }
+    const item = await this.prisma.vendorMenuItem.update({
+      where: { id: itemId },
+      data: {
+        name: dto.name?.trim(),
+        description: dto.description
+          ? this.normalizeString(dto.description)
+          : undefined,
+        price:
+          dto.price === undefined ? undefined : Number(dto.price ?? 0),
+        categoryId:
+          dto.categoryId === undefined ? undefined : dto.categoryId ?? null,
+        imageUrl:
+          dto.imageUrl === undefined
+            ? undefined
+            : this.normalizeString(dto.imageUrl),
+        isAvailable: dto.isAvailable ?? undefined,
+        isHighlighted: dto.isHighlighted ?? undefined,
+        position: dto.position ?? undefined,
+      },
+    });
+    return this.mapMenuItem(item);
+  }
+
+  async deleteMenuItem(vendorId: string, itemId: string) {
+    const existing = await this.prisma.vendorMenuItem.findFirst({
+      where: { id: itemId, vendorId },
+    });
+    if (!existing) {
+      throw new BadRequestException('Menu item niet gevonden');
+    }
+    await this.prisma.vendorMenuItem.delete({ where: { id: itemId } });
+    return { ok: true };
+  }
+
   toSafeVendor(vendor: Vendor): SafeVendor {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { passwordHash, ...rest } = vendor;
     return rest;
+  }
+
+  private mapVendorProfile(vendor: Vendor) {
+    return {
+      id: vendor.id,
+      email: vendor.email,
+      name: vendor.name,
+      contactName: vendor.contactName,
+      phone: vendor.phone,
+      street: vendor.street,
+      postalCode: vendor.postalCode,
+      city: vendor.city,
+      description: vendor.description,
+      heroImageUrl: vendor.heroImageUrl,
+      logoImageUrl: vendor.logoImageUrl,
+      minOrder: this.decimalToNumber(vendor.minOrder),
+      deliveryFee: this.decimalToNumber(vendor.deliveryFee),
+      etaDisplay: vendor.etaDisplay,
+      cuisine: vendor.cuisine,
+      category: vendor.category,
+      isActive: vendor.isActive,
+      isFeatured: vendor.isFeatured,
+      isVerified: vendor.isActive,
+      createdAt: vendor.createdAt,
+      updatedAt: vendor.updatedAt,
+    };
+  }
+
+  private mapCategoryWithItems(category: CategoryWithItems) {
+    return {
+      id: category.id,
+      name: category.name,
+      description: category.description,
+      position: category.position,
+      createdAt: category.createdAt,
+      updatedAt: category.updatedAt,
+      items: category.items.map((item) => this.mapMenuItem(item)),
+    };
+  }
+
+  private mapMenuItem(item: MenuItemEntity) {
+    return {
+      id: item.id,
+      vendorId: item.vendorId,
+      categoryId: item.categoryId,
+      name: item.name,
+      description: item.description,
+      price: this.decimalToNumber(item.price) ?? 0,
+      imageUrl: item.imageUrl,
+      isAvailable: item.isAvailable,
+      isHighlighted: item.isHighlighted,
+      position: item.position,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+    };
+  }
+
+  private normalizeString(value?: string | null) {
+    if (typeof value !== 'string') {
+      return value ?? null;
+    }
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  private decimalToNumber(value?: Prisma.Decimal | number | null) {
+    if (value === null || value === undefined) {
+      return null;
+    }
+    if (typeof value === 'number') {
+      return value;
+    }
+    return value ? Number(value) : null;
   }
 
   private extractToken(req: Request): string | null {
