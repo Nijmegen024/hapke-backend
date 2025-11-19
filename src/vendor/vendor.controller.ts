@@ -9,6 +9,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Req,
   Res,
 } from '@nestjs/common';
@@ -28,6 +29,7 @@ import {
   CreateMenuItemDto,
   UpdateMenuItemDto,
 } from './dto/menu-item.dto';
+import { UpdateRestaurantSettingsDto } from './dto/restaurant-settings.dto';
 
 @Controller('vendor')
 export class VendorController {
@@ -91,6 +93,21 @@ export class VendorController {
   ) {
     const vendor = await this.vendors.authenticateRequest(req);
     return this.vendors.updateVendorProfile(vendor.id, dto);
+  }
+
+  @Get('restaurant')
+  async getRestaurant(@Req() req: Request) {
+    const vendor = await this.vendors.authenticateRequest(req);
+    return this.vendors.getRestaurantSettings(vendor.id);
+  }
+
+  @Put('restaurant')
+  async updateRestaurant(
+    @Req() req: Request,
+    @Body() dto: UpdateRestaurantSettingsDto,
+  ) {
+    const vendor = await this.vendors.authenticateRequest(req);
+    return this.vendors.updateRestaurantSettings(vendor.id, dto);
   }
 
   @Get('menu')

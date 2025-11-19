@@ -13,6 +13,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RegisterVendorDto } from './dto/register-vendor.dto';
 import { LoginVendorDto } from './dto/login-vendor.dto';
 import { UpdateVendorProfileDto } from './dto/update-vendor-profile.dto';
+import { UpdateRestaurantSettingsDto } from './dto/restaurant-settings.dto';
 import {
   CreateMenuCategoryDto,
   UpdateMenuCategoryDto,
@@ -211,6 +212,49 @@ export class VendorService {
       },
     });
     return this.mapVendorProfile(vendor);
+  }
+
+  async getRestaurantSettings(vendorId: string) {
+    const vendor = await this.prisma.vendor.findUnique({
+      where: { id: vendorId },
+      select: {
+        name: true,
+        description: true,
+        minOrder: true,
+      },
+    });
+    if (!vendor) {
+      throw new UnauthorizedException('Vendor niet gevonden');
+    }
+    return {
+      name: vendor.name,
+      description: vendor.description,
+      minOrderAmount: this.decimalToNumber(vendor.minOrder),
+    };
+  }
+
+  async updateRestaurantSettings(
+    vendorId: string,
+    dto: UpdateRestaurantSettingsDto,
+  ) {
+    const vendor = await this.prisma.vendor.update({
+      where: { id: vendorId },
+      data: {
+        name: dto.name.trim(),
+        description: this.normalizeString(dto.description),
+        minOrder: Number(dto.minOrderAmount),
+      },
+      select: {
+        name: true,
+        description: true,
+        minOrder: true,
+      },
+    });
+    return {
+      name: vendor.name,
+      description: vendor.description,
+      minOrderAmount: this.decimalToNumber(vendor.minOrder),
+    };
   }
 
   async createCategory(vendorId: string, dto: CreateMenuCategoryDto) {
