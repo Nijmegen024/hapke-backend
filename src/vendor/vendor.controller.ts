@@ -114,7 +114,7 @@ export class VendorController {
   async menu(@Req() req: Request) {
     const vendor = await this.vendors.authenticateRequest(req);
     const dashboard = await this.vendors.getVendorDashboard(vendor.id);
-    return dashboard.menu;
+    return dashboard.menu.categories;
   }
 
   @Post('menu/categories')
