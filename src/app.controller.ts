@@ -1,4 +1,5 @@
 import { Controller, Get, Param } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { AppService } from './app.service';
 import { PrismaService } from './prisma/prisma.service';
 
@@ -44,26 +45,48 @@ export class RestaurantsController {
 
     const vendors = await this.prisma.vendor.findMany({
       orderBy: { createdAt: 'desc' },
+      include: {
+        menuItems: {
+          where: { isAvailable: true },
+          orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+        },
+      },
     });
 
     const vendorRestaurants = vendors.map((vendor) => ({
       id: vendor.id,
       name: vendor.name,
-      cuisine: vendor.description
-        ? vendor.description
-        : 'Beschrijving nog in te vullen',
+      cuisine:
+        vendor.cuisine ??
+        vendor.description ??
+        'Beschrijving nog in te vullen',
       rating: vendor.isActive ? 4.5 : 0,
-      minOrder: 20,
-      deliveryCost: 0,
+      minOrder: this.decimalToNumber(vendor.minOrder) ?? 20,
+      deliveryCost: this.decimalToNumber(vendor.deliveryFee) ?? 0,
       city: vendor.city,
+      category: vendor.category ?? 'Nieuw',
+      eta: vendor.etaDisplay ?? '35–45 min',
+      imageUrl:
+        vendor.heroImageUrl ??
+        vendor.logoImageUrl ??
+        'https://images.unsplash.com/photo-1541542684-4abf21a55761?auto=format&fit=crop&w=1200&q=80',
       isActive: vendor.isActive,
+      menu: vendor.menuItems.map((item) => ({
+        id: item.id,
+        name: item.name,
+        description: item.description ?? '',
+        priceCents: this.priceToCents(item.price),
+        categoryId: item.categoryId,
+        imageUrl: item.imageUrl,
+        isHighlighted: item.isHighlighted,
+      })),
     }));
 
     return [...staticRestaurants, ...vendorRestaurants];
   }
 
   @Get(':id/menu')
-  menu(@Param('id') id: string) {
+  async menu(@Param('id') id: string) {
     if (id === 'r1') {
       return [
         {
@@ -132,6 +155,42 @@ export class RestaurantsController {
         },
       ];
     }
-    return [];
+    const vendor = await this.prisma.vendor.findUnique({
+      where: { id },
+      include: {
+        menuItems: {
+          where: { isAvailable: true },
+          orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+        },
+      },
+    });
+    if (!vendor) {
+      return [];
+    }
+    return vendor.menuItems.map((item) => ({
+      id: item.id,
+      title: item.name,
+      description: item.description ?? '',
+      price: this.decimalToNumber(item.price) ?? 0,
+      priceCents: this.priceToCents(item.price),
+    }));
+  }
+
+  private decimalToNumber(
+    value?: Prisma.Decimal | number | null,
+  ): number | null {
+    if (value === null || value === undefined) {
+      return null;
+    }
+    if (typeof value === 'number') {
+      return value;
+    }
+    return Number(value);
+  }
+
+  private priceToCents(value?: Prisma.Decimal | number | null) {
+    const euros = this.decimalToNumber(value) ?? 0;
+    const cents = Math.round(euros * 100);
+    return cents < 0 ? 0 : cents;
   }
 }
