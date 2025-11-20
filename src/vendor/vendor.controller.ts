@@ -126,6 +126,15 @@ export class VendorController {
     return this.vendors.createCategory(vendor.id, dto);
   }
 
+  @Post('menu/category')
+  async createCategoryLegacy(
+    @Req() req: Request,
+    @Body() dto: CreateMenuCategoryDto,
+  ) {
+    const vendor = await this.vendors.authenticateRequest(req);
+    return this.vendors.createCategory(vendor.id, dto);
+  }
+
   @Patch('menu/categories/:id')
   async updateCategory(
     @Req() req: Request,
@@ -151,6 +160,15 @@ export class VendorController {
     return this.vendors.createMenuItem(vendor.id, dto);
   }
 
+  @Post('menu/item')
+  async createMenuItemSingular(
+    @Req() req: Request,
+    @Body() dto: CreateMenuItemDto,
+  ) {
+    const vendor = await this.vendors.authenticateRequest(req);
+    return this.vendors.createMenuItem(vendor.id, dto);
+  }
+
   @Patch('menu/items/:id')
   async updateMenuItem(
     @Req() req: Request,
@@ -163,6 +181,25 @@ export class VendorController {
 
   @Delete('menu/items/:id')
   async deleteMenuItem(@Req() req: Request, @Param('id') id: string) {
+    const vendor = await this.vendors.authenticateRequest(req);
+    return this.vendors.deleteMenuItem(vendor.id, id);
+  }
+
+  @Put('menu/item/:id')
+  async replaceMenuItem(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body() dto: UpdateMenuItemDto,
+  ) {
+    const vendor = await this.vendors.authenticateRequest(req);
+    return this.vendors.updateMenuItem(vendor.id, id, dto);
+  }
+
+  @Delete('menu/item/:id')
+  async deleteMenuItemSingular(
+    @Req() req: Request,
+    @Param('id') id: string,
+  ) {
     const vendor = await this.vendors.authenticateRequest(req);
     return this.vendors.deleteMenuItem(vendor.id, id);
   }
