@@ -91,31 +91,31 @@ export class RestaurantsController {
       return [
         {
           id: 'm1',
-          title: 'Margherita',
+          name: 'Margherita',
           description: 'Tomaat, mozzarella, basilicum',
           price: 9.5,
         },
         {
           id: 'm2',
-          title: 'Quattro Formaggi',
+          name: 'Quattro Formaggi',
           description: 'Vier kazen, romig & rijk',
           price: 12.5,
         },
         {
           id: 'm3',
-          title: 'Tiramisu',
+          name: 'Tiramisu',
           description: 'Huisgemaakt dessert',
           price: 6.5,
         },
         {
           id: 'm15',
-          title: 'Pizza Pepperoni',
+          name: 'Pizza Pepperoni',
           description: 'Pepperoni, mozzarella, tomaat',
           price: 11.5,
         },
         {
           id: 'm16',
-          title: 'Lasagne',
+          name: 'Lasagne',
           description: 'Laagjes pasta, gehakt, bechamelsaus',
           price: 12.0,
         },
@@ -125,31 +125,31 @@ export class RestaurantsController {
       return [
         {
           id: 'm4',
-          title: 'Salmon Maki (8st)',
+          name: 'Salmon Maki (8st)',
           description: 'Zalm, nori, rijst',
           price: 8.95,
         },
         {
           id: 'm5',
-          title: 'Spicy Tuna Roll',
+          name: 'Spicy Tuna Roll',
           description: 'Tonijn met pit',
           price: 11.95,
         },
         {
           id: 'm6',
-          title: 'Gyoza (6st)',
+          name: 'Gyoza (6st)',
           description: 'Kip & groente',
           price: 6.75,
         },
         {
           id: 'm17',
-          title: 'California Roll',
+          name: 'California Roll',
           description: 'Krab, avocado, komkommer',
           price: 9.95,
         },
         {
           id: 'm18',
-          title: 'Ebi Tempura',
+          name: 'Ebi Tempura',
           description: 'Gefrituurde garnaal, saus',
           price: 10.95,
         },
@@ -169,7 +169,7 @@ export class RestaurantsController {
     }
     return vendor.menuItems.map((item) => ({
       id: item.id,
-      title: item.name,
+      name: item.name,
       description: item.description ?? '',
       price: this.decimalToNumber(item.price) ?? 0,
       priceCents: this.priceToCents(item.price),
