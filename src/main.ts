@@ -18,8 +18,7 @@ async function bootstrap() {
   app.use(express.json());
   app.enableCors({ origin: true, credentials: true });
 
-  const port = parseInt(process.env.PORT ?? '3000', 10);
-  const host = '0.0.0.0';
+  const port = process.env.PORT || 3000;
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const server = app.getHttpAdapter().getInstance();
@@ -317,7 +316,7 @@ async function bootstrap() {
   });
   // --- End Simple Vendor Portal ---
 
-  await app.listen(port, host);
+  await app.listen(process.env.PORT || 3000);
 
   const publicUrl =
     process.env.RENDER_EXTERNAL_URL || `http://localhost:${port}`;
