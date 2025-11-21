@@ -145,8 +145,29 @@ export class VendorController {
     return this.vendors.updateCategory(vendor.id, id, dto);
   }
 
+  // Legacy/singular route to match portal client
+  @Put('menu/category/:id')
+  async updateCategorySingular(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body() dto: UpdateMenuCategoryDto,
+  ) {
+    const vendor = await this.vendors.authenticateRequest(req);
+    return this.vendors.updateCategory(vendor.id, id, dto);
+  }
+
   @Delete('menu/categories/:id')
   async deleteCategory(@Req() req: Request, @Param('id') id: string) {
+    const vendor = await this.vendors.authenticateRequest(req);
+    return this.vendors.deleteCategory(vendor.id, id);
+  }
+
+  // Legacy/singular route to match portal client
+  @Delete('menu/category/:id')
+  async deleteCategorySingular(
+    @Req() req: Request,
+    @Param('id') id: string,
+  ) {
     const vendor = await this.vendors.authenticateRequest(req);
     return this.vendors.deleteCategory(vendor.id, id);
   }
