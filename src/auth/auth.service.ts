@@ -223,6 +223,24 @@ export class AuthService {
     return this.mapUser(user, user.addresses);
   }
 
+  async resendVerification(emailRaw: string) {
+    const email = emailRaw.toLowerCase().trim();
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      throw new BadRequestException('Gebruiker niet gevonden');
+    }
+    if (user.isVerified) {
+      throw new BadRequestException('Account is al geactiveerd');
+    }
+    const newToken = this.generateVerificationToken();
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { verificationToken: newToken },
+    });
+    await this.sendVerificationEmail(user, newToken);
+    return { message: 'Verificatiemail opnieuw verstuurd' };
+  }
+
   attachRefreshCookie(res: Response, token: string) {
     res.cookie(this.refreshCookieName, token, {
       httpOnly: true,
