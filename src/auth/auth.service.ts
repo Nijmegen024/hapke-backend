@@ -60,18 +60,26 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
     const verificationToken = this.generateVerificationToken();
+    const verificationDisabled =
+      (process.env.DISABLE_EMAIL_VERIFICATION || '').toLowerCase() === 'true';
 
     const user = await this.prisma.user.create({
       data: {
         email,
         passwordHash,
-        verificationToken,
+        verificationToken: verificationDisabled ? null : verificationToken,
+        isVerified: verificationDisabled,
       },
     });
 
-    await this.sendVerificationEmail(user, verificationToken);
+    if (!verificationDisabled) {
+      await this.sendVerificationEmail(user, verificationToken);
+    }
 
-    return { user: this.mapUser(user), requiresVerification: true };
+    return {
+      user: this.mapUser(user),
+      requiresVerification: !verificationDisabled,
+    };
   }
 
   async login(dto: LoginDto) {
@@ -225,6 +233,13 @@ export class AuthService {
 
   async resendVerification(emailRaw: string) {
     const email = emailRaw.toLowerCase().trim();
+    const verificationDisabled =
+      (process.env.DISABLE_EMAIL_VERIFICATION || '').toLowerCase() === 'true';
+    if (verificationDisabled) {
+      throw new BadRequestException(
+        'E-mailverificatie staat uit; account wordt direct geactiveerd.',
+      );
+    }
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) {
       throw new BadRequestException('Gebruiker niet gevonden');
