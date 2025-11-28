@@ -94,7 +94,11 @@ export class AuthService {
         throw new UnauthorizedException('Ongeldige inlog');
       }
 
-      if (!user.isVerified) {
+      const verificationDisabled =
+        (process.env.DISABLE_EMAIL_VERIFICATION || '').toLowerCase() ===
+        'true';
+
+      if (!verificationDisabled && !user.isVerified) {
         this.logger.warn(`Login geweigerd voor ${email}: account niet actief`);
         throw new UnauthorizedException('Account nog niet geactiveerd');
       }
