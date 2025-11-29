@@ -34,7 +34,7 @@ export class AdminService {
     const { restaurantId, from, to } = params;
     return this.prisma.order.findMany({
       where: {
-        restaurantId: restaurantId || undefined,
+        vendorId: restaurantId || undefined,
         createdAt: {
           gte: from || undefined,
           lte: to || undefined,
