@@ -8,7 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import type { Request, Response } from 'express';
 
-import type { Vendor, Prisma } from '@prisma/client';
+import type { Vendor, Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterVendorDto } from './dto/register-vendor.dto';
 import { LoginVendorDto } from './dto/login-vendor.dto';
@@ -25,7 +25,7 @@ import {
 
 type VendorTokenPayload = {
   sub: string;
-  role: 'vendor';
+  role: Role;
   email: string;
 };
 
@@ -123,7 +123,7 @@ export class VendorService {
     const payload: VendorTokenPayload = {
       sub: vendor.id,
       email: vendor.email,
-      role: 'vendor',
+      role: vendor.role,
     };
     return this.jwt.signAsync(payload);
   }

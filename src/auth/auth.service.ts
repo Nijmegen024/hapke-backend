@@ -289,7 +289,11 @@ export class AuthService {
   }
 
   private async generateTokenPair(user: User) {
-    const payload = { sub: user.id, email: user.email };
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role ?? 'CUSTOMER',
+    };
     const accessToken = await this.jwtService.signAsync(payload, {
       secret: this.accessSecret,
       expiresIn: this.accessTtl,
@@ -306,6 +310,7 @@ export class AuthService {
       email: user.email,
       name: user.name,
       isVerified: user.isVerified,
+      role: user.role,
       createdAt: user.createdAt,
     };
 

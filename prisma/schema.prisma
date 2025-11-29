@@ -87,6 +87,11 @@ enum OrderStatus {
   DELIVERED
 }
 
+enum Role {
+  ADMIN
+  VENDOR
+}
+
 model Order {
   id          String      @id @default(cuid())
   orderNumber String      @unique
@@ -140,6 +145,7 @@ model Vendor {
   cuisine     String?
   category    String?
   isFeatured  Boolean  @default(false)
+  role       Role    @default(VENDOR)
   orders      Order[]
   menuCategories VendorMenuCategory[]
   menuItems   VendorMenuItem[]
