@@ -25,7 +25,44 @@ async function main() {
     },
   });
 
+  const vendors = [
+    {
+      email: 'pizzeria@hapke.nl',
+      name: 'Pizzeria Napoli',
+      city: 'Nijmegen',
+      postalCode: '6511 AB',
+      street: 'Pizzaweg 1',
+      description: 'Verse pizza uit steenoven',
+    },
+    {
+      email: 'sushi@hapke.nl',
+      name: 'Sushi Nijmeegs',
+      city: 'Nijmegen',
+      postalCode: '6512 CD',
+      street: 'Sashimistraat 5',
+      description: 'Sushi en bowls',
+    },
+  ];
+
+  for (const v of vendors) {
+    await prisma.vendor.upsert({
+      where: { email: v.email },
+      update: {},
+      create: {
+        email: v.email,
+        passwordHash: await bcrypt.hash('hapke123', 10),
+        name: v.name,
+        city: v.city,
+        postalCode: v.postalCode,
+        street: v.street,
+        description: v.description,
+        isActive: true,
+      },
+    });
+  }
+
   console.log('Admin user ready:', email);
+  console.log('Vendors ready:', vendors.map((v) => v.email).join(', '));
 }
 
 main()
