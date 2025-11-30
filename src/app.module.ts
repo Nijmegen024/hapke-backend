@@ -14,6 +14,7 @@ import { ChatsModule } from './chats/chats.module';
 import { FriendsModule } from './friends/friends.module';
 import { AdminModule } from './admin/admin.module';
 import { RolesGuard } from './auth/roles.guard';
+import { MediaModule } from './media/media.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { RolesGuard } from './auth/roles.guard';
     ChatsModule,
     FriendsModule,
     AdminModule,
+    MediaModule,
   ],
   controllers: [
     AppController,
