@@ -137,6 +137,20 @@ export class VendorService {
     }
   }
 
+  async authenticateToken(rawToken: string | null) {
+    if (!rawToken) {
+      throw new UnauthorizedException('Geen vendor sessie gevonden');
+    }
+    const payload = await this.verifyToken(rawToken);
+    const vendor = await this.prisma.vendor.findUnique({
+      where: { id: payload.sub },
+    });
+    if (!vendor) {
+      throw new UnauthorizedException('Vendor niet gevonden');
+    }
+    return vendor;
+  }
+
   async authenticateRequest(req: Request) {
     const token = this.extractToken(req);
     if (!token) {
