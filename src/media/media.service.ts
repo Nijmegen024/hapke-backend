@@ -1,16 +1,25 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { createClient } from '@supabase/supabase-js';
 import { VendorService } from '../vendor/vendor.service';
 
 @Injectable()
 export class MediaService {
-  private supabase = createClient(
-    process.env.SUPABASE_URL ?? '',
-    process.env.SUPABASE_SERVICE_ROLE ?? '',
-  );
-  private bucket = process.env.SUPABASE_BUCKET ?? 'Restaurant-media';
+  private supabase;
+  private bucket;
+  private supabaseUrl;
 
-  constructor(private readonly vendors: VendorService) {}
+  constructor(private readonly vendors: VendorService) {
+    this.supabaseUrl = process.env.SUPABASE_URL ?? '';
+    this.supabase = createClient(
+      this.supabaseUrl,
+      process.env.SUPABASE_SERVICE_ROLE ?? '',
+    );
+    this.bucket = process.env.SUPABASE_BUCKET ?? 'Restaurant-media';
+  }
 
   async signUpload(token: string | null, originalName?: string) {
     const vendor = await this.vendors.authenticateToken(token);
@@ -21,22 +30,24 @@ export class MediaService {
     const ext = originalName?.split('.').pop() || 'jpg';
     const filePath = `${vendor.id}/${Date.now()}.${ext}`;
 
-    const { data, error } = await this.supabase.storage
+    return this.getSignedUploadUrl(filePath);
+  }
+
+  async getSignedUploadUrl(filePath: string) {
+    const { data, error } = await this.supabase
+      .storage
       .from(this.bucket)
-      .createSignedUploadUrl(filePath, { upsert: false });
+      .createSignedUploadUrl(filePath, {
+        upsert: true,
+      });
 
-    if (error || !data?.signedUrl) {
-      throw new Error(error?.message ?? 'Upload URL maken mislukt');
+    if (error) {
+      throw new BadRequestException('Failed to create signed URL');
     }
-
-    const publicUrl =
-      this.supabase.storage.from(this.bucket).getPublicUrl(filePath).data
-        ?.publicUrl ?? null;
 
     return {
       uploadUrl: data.signedUrl,
-      path: filePath,
-      publicUrl,
+      publicUrl: `${this.supabaseUrl}/storage/v1/object/public/${this.bucket}/${filePath}`,
     };
   }
 }
