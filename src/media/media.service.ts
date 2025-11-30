@@ -23,7 +23,7 @@ export class MediaService {
 
     const { data, error } = await this.supabase.storage
       .from(this.bucket)
-      .createSignedUploadUrl(filePath, 60);
+      .createSignedUploadUrl(filePath, { expiresIn: 60, upsert: true });
 
     if (error || !data?.signedUrl) {
       throw new Error(error?.message ?? 'Upload URL maken mislukt');
