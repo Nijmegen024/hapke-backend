@@ -27,6 +27,14 @@ async function main() {
 
   const vendors = [
     {
+      email: 'info@hapke.nl',
+      name: 'Hapke Demo Restaurant',
+      city: 'Nijmegen',
+      postalCode: '6511 AB',
+      street: 'Demo Straat 1',
+      description: 'Demo restaurant voor beheer',
+    },
+    {
       email: 'pizzeria@hapke.nl',
       name: 'Pizzeria Napoli',
       city: 'Nijmegen',
