@@ -92,10 +92,12 @@ export class VendorService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const passwordOk = await bcrypt.compare(
-      passwordNorm,
-      vendor.passwordHash ?? '',
-    );
+    const digest = vendor.passwordHash ?? '';
+    const passwordOk = await bcrypt.compare(passwordNorm, digest);
+
+    console.log('EMAIL:', emailNorm);
+    console.log('VENDOR:', vendor);
+    console.log('PASSWORD_OK:', passwordOk);
 
     if (!passwordOk) {
       throw new UnauthorizedException('Invalid credentials');
