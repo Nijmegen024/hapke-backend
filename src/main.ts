@@ -96,26 +96,25 @@ async function bootstrap() {
       req: Request<Record<string, string>, unknown, VendorLoginBody>,
       res: Response,
     ) => {
-      const emailRaw = req.body?.email;
-      const passwordRaw = req.body?.password;
-      const email = typeof emailRaw === 'string' ? emailRaw.trim() : '';
-      const password =
-        typeof passwordRaw === 'string' ? passwordRaw.trim() : '';
-      if (!email || !password) {
-        return res.status(400).send('Missing email or password');
-      }
-
       try {
-        const vendor = await vendorService.validateCredentials({
+        const emailRaw = req.body?.email;
+        const passwordRaw = req.body?.password;
+        const email = typeof emailRaw === 'string' ? emailRaw.trim() : '';
+        const password =
+          typeof passwordRaw === 'string' ? passwordRaw.trim() : '';
+        if (!email || !password) {
+          return res.status(400).send('Missing email or password');
+        }
+
+        const { accessToken, vendor } = await vendorService.login(
           email,
           password,
-        });
-        const token = await vendorService.signToken(vendor);
-        vendorService.applyAuthCookie(res, token);
+        );
+        vendorService.applyAuthCookie(res, accessToken);
         return res.json({
           result: 'ok',
-          token,
-          vendor: vendorService.toSafeVendor(vendor),
+          token: accessToken,
+          vendor,
         });
       } catch (error) {
         const status =
