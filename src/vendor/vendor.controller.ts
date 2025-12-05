@@ -58,13 +58,15 @@ export class VendorController {
     @Body() dto: LoginVendorDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const vendor = await this.vendors.validateCredentials(dto);
-    const token = await this.vendors.signToken(vendor);
-    this.vendors.applyAuthCookie(res, token);
+    const { accessToken, vendor } = await this.vendors.login(
+      dto.email,
+      dto.password,
+    );
+    this.vendors.applyAuthCookie(res, accessToken);
     return {
       message: 'Ingelogd',
-      token,
-      vendor: this.vendors.toSafeVendor(vendor),
+      token: accessToken,
+      vendor,
     };
   }
 

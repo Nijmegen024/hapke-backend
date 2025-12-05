@@ -80,6 +80,41 @@ export class VendorService {
     return vendor;
   }
 
+  async login(email: string, password: string) {
+    const vendor = await this.prisma.vendor.findUnique({
+      where: { email },
+    });
+
+    if (!vendor) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const passwordOk = await bcrypt.compare(
+      password,
+      vendor.passwordHash ?? '',
+    );
+
+    if (!passwordOk) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const payload: VendorTokenPayload = {
+      sub: vendor.id,
+      role: 'VENDOR',
+      email: vendor.email,
+    };
+    const accessToken = await this.jwt.signAsync(payload);
+
+    return {
+      accessToken,
+      vendor: {
+        id: vendor.id,
+        email: vendor.email,
+        name: vendor.name,
+      },
+    };
+  }
+
   async validateCredentials(dto: LoginVendorDto) {
     const email = dto.email.toLowerCase().trim();
     const password = dto.password.trim();
