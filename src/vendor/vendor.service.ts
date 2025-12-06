@@ -87,32 +87,20 @@ export class VendorService {
     });
 
     if (!vendor) {
+      this.logger.warn(`LOGIN vendor ${emailNorm} not found`);
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Temporarily skip password verification
-    const payload: VendorTokenPayload = { sub: vendor.id, role: 'VENDOR', email: vendor.email };
-    const accessToken = await this.jwt.signAsync(payload);
+    const passwordOk = await bcrypt.compare(
+      password,
+      vendor.passwordHash ?? '',
+    );
 
-    return {
-      accessToken,
-      vendor: {
-        id: vendor.id,
-        email: vendor.email,
-        name: vendor.name,
-      },
-    };
-  }
+    this.logger.log(`LOGIN vendor ${emailNorm} found? ${!!vendor}`);
+    this.logger.log(`LOGIN password ok? ${passwordOk}`);
 
-  // Demo login zonder wachtwoord: kies een bestaand restaurant en krijg een token
-  async loginDemo(email: string) {
-    const emailNorm = (email ?? '').toLowerCase().trim();
-    const vendor = await this.prisma.vendor.findUnique({
-      where: { email: emailNorm },
-    });
-
-    if (!vendor) {
-      throw new UnauthorizedException('Vendor not found');
+    if (!passwordOk) {
+      throw new UnauthorizedException('Invalid credentials');
     }
 
     const payload: VendorTokenPayload = { sub: vendor.id, role: 'VENDOR', email: vendor.email };
@@ -178,9 +166,12 @@ export class VendorService {
 
   async verifyToken(token: string): Promise<VendorTokenPayload> {
     try {
-      // Debug: log welke secret wordt gebruikt
-      this.logger.log(`JWT secret in verifyToken = ${process.env.JWT_SECRET}`);
-      return await this.jwt.verifyAsync<VendorTokenPayload>(token);
+      this.logger.log(
+        `VERIFY JWT secret defined? ${!!process.env.JWT_SECRET}`,
+      );
+      const payload = await this.jwt.verifyAsync<VendorTokenPayload>(token);
+      this.logger.log('VERIFY payload', payload);
+      return payload;
     } catch (error) {
       this.logger.warn(`Vendor token ongeldig: ${error}`);
       throw new UnauthorizedException('Ongeldige sessie');

@@ -7,10 +7,7 @@ import { VendorService } from './vendor.service';
 @Module({
   imports: [
     JwtModule.register({
-      secret:
-        process.env.JWT_ACCESS_SECRET ??
-        process.env.JWT_SECRET ??
-        'dev-access-secret',
+      secret: process.env.JWT_SECRET ?? 'dev-access-secret',
       signOptions: { expiresIn: '30d' },
     }),
   ],

@@ -58,12 +58,6 @@ export class VendorController {
     return this.vendors.login(body.email, body.password);
   }
 
-  // Demo login zonder wachtwoord: kies een bestaand restaurant en log direct in
-  @Post('login/demo')
-  async loginDemo(@Body() body: { email: string }) {
-    return this.vendors.loginDemo(body.email);
-  }
-
   @Post('logout')
   @HttpCode(204)
   async logout(@Res({ passthrough: true }) res: Response) {
