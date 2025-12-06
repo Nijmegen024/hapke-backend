@@ -178,6 +178,8 @@ export class VendorService {
 
   async verifyToken(token: string): Promise<VendorTokenPayload> {
     try {
+      // Debug: log welke secret wordt gebruikt
+      this.logger.log(`JWT secret in verifyToken = ${process.env.JWT_SECRET}`);
       return await this.jwt.verifyAsync<VendorTokenPayload>(token);
     } catch (error) {
       this.logger.warn(`Vendor token ongeldig: ${error}`);
