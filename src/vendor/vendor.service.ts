@@ -104,6 +104,30 @@ export class VendorService {
     };
   }
 
+  // Demo login zonder wachtwoord: kies een bestaand restaurant en krijg een token
+  async loginDemo(email: string) {
+    const emailNorm = (email ?? '').toLowerCase().trim();
+    const vendor = await this.prisma.vendor.findUnique({
+      where: { email: emailNorm },
+    });
+
+    if (!vendor) {
+      throw new UnauthorizedException('Vendor not found');
+    }
+
+    const payload: VendorTokenPayload = { sub: vendor.id, role: 'VENDOR', email: vendor.email };
+    const accessToken = await this.jwt.signAsync(payload);
+
+    return {
+      accessToken,
+      vendor: {
+        id: vendor.id,
+        email: vendor.email,
+        name: vendor.name,
+      },
+    };
+  }
+
   async validateCredentials(dto: LoginVendorDto) {
     const email = dto.email.toLowerCase().trim();
     const password = dto.password.trim();
