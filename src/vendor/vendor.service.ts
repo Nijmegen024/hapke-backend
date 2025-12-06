@@ -81,8 +81,9 @@ export class VendorService {
   }
 
   async login(email: string, password: string) {
+    const emailNorm = (email ?? '').toLowerCase().trim();
     const vendor = await this.prisma.vendor.findUnique({
-      where: { email },
+      where: { email: emailNorm },
     });
 
     if (!vendor) {
