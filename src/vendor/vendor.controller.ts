@@ -54,20 +54,8 @@ export class VendorController {
   }
 
   @Post('login')
-  async login(
-    @Body() dto: LoginVendorDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const { accessToken, vendor } = await this.vendors.login(
-      dto.email,
-      dto.password,
-    );
-    this.vendors.applyAuthCookie(res, accessToken);
-    return {
-      message: 'Ingelogd',
-      token: accessToken,
-      vendor,
-    };
+  async login(@Body() body: { email: string; password: string }) {
+    return this.vendors.login(body.email, body.password);
   }
 
   @Post('logout')
