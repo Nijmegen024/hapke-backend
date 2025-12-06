@@ -25,6 +25,7 @@ async function bootstrap() {
   ensureExpressServer(server);
   // --- Simple Vendor Portal (Demo) ---
   const vendorService = app.get(VendorService);
+  console.log('JWT_SECRET length at boot:', process.env.JWT_SECRET?.length);
   const vendorBaseUrl =
     process.env.VENDOR_PORTAL_BASE_URL || 'https://hapke-backend.onrender.com';
 

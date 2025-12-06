@@ -92,7 +92,7 @@ export class VendorService {
     }
 
     const passwordOk = await bcrypt.compare(
-      password,
+      (password ?? '').trim(),
       vendor.passwordHash ?? '',
     );
 
@@ -103,8 +103,15 @@ export class VendorService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const payload: VendorTokenPayload = { sub: vendor.id, role: 'VENDOR', email: vendor.email };
-    const accessToken = await this.jwt.signAsync(payload);
+    const payload: VendorTokenPayload = {
+      sub: vendor.id,
+      role: 'VENDOR',
+      email: vendor.email,
+    };
+    const accessToken = this.jwt.sign(payload);
+    this.logger.log(
+      `LOGIN payload: ${JSON.stringify(payload)}, token(first20): ${accessToken.slice(0, 20)}`,
+    );
 
     return {
       accessToken,
