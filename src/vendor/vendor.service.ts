@@ -99,7 +99,24 @@ export class VendorService {
     this.logger.log(`LOGIN vendor ${emailNorm} found? ${!!vendor}`);
     this.logger.log(`LOGIN password ok? ${passwordOk}`);
 
-    if (!passwordOk) {
+    let finalOk = passwordOk;
+
+    // Fallback: als er per ongeluk een plain password is opgeslagen, probeer een directe match en upgrade dan naar hash
+    if (!finalOk && vendor.passwordHash && vendor.passwordHash === password) {
+      this.logger.warn('LOGIN found plain password; upgrading to hash');
+      finalOk = true;
+      try {
+        const upgradedHash = await bcrypt.hash(password.trim(), 12);
+        await this.prisma.vendor.update({
+          where: { id: vendor.id },
+          data: { passwordHash: upgradedHash },
+        });
+      } catch (e) {
+        this.logger.warn(`Could not upgrade plain password for ${vendor.email}: ${e}`);
+      }
+    }
+
+    if (!finalOk) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
