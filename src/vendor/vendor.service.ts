@@ -300,6 +300,8 @@ export class VendorService {
         name: true,
         description: true,
         minOrder: true,
+        heroImageUrl: true,
+        logoImageUrl: true,
       },
     });
     if (!vendor) {
@@ -309,6 +311,8 @@ export class VendorService {
       name: vendor.name,
       description: vendor.description,
       minOrderAmount: this.decimalToNumber(vendor.minOrder),
+      heroImageUrl: this.normalizeString(vendor.heroImageUrl),
+      logoImageUrl: this.normalizeString(vendor.logoImageUrl),
     };
   }
 
@@ -322,17 +326,23 @@ export class VendorService {
         name: dto.name.trim(),
         description: this.normalizeString(dto.description),
         minOrder: Number(dto.minOrderAmount),
+        heroImageUrl: this.normalizeString(dto.heroImageUrl),
+        logoImageUrl: this.normalizeString(dto.logoImageUrl),
       },
       select: {
         name: true,
         description: true,
         minOrder: true,
+        heroImageUrl: true,
+        logoImageUrl: true,
       },
     });
     return {
       name: vendor.name,
       description: vendor.description,
       minOrderAmount: this.decimalToNumber(vendor.minOrder),
+      heroImageUrl: this.normalizeString(vendor.heroImageUrl),
+      logoImageUrl: this.normalizeString(vendor.logoImageUrl),
     };
   }
 
