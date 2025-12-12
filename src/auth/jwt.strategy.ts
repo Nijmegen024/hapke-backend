@@ -16,25 +16,35 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey:
-        process.env.JWT_ACCESS_SECRET ??
-        process.env.JWT_SECRET ??
-        'dev-access-secret',
+      secretOrKey: process.env.JWT_SECRET ?? 'dev-access-secret',
     });
   }
 
   async validate(payload: JwtPayload) {
+    // probeer eerst gewone gebruiker
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
     });
-    if (!user) {
-      throw new UnauthorizedException('Token is niet langer geldig');
+    if (user) {
+      return {
+        id: user.id,
+        email: user.email,
+        role: payload.role ?? user.role,
+      };
     }
 
-    return {
-      id: user.id,
-      email: user.email,
-      role: payload.role ?? user.role,
-    };
+    // fallback: vendor-token
+    const vendor = await this.prisma.vendor.findUnique({
+      where: { id: payload.sub },
+    });
+    if (vendor) {
+      return {
+        id: vendor.id,
+        email: vendor.email,
+        role: payload.role ?? 'VENDOR',
+      };
+    }
+
+    throw new UnauthorizedException('Token is niet langer geldig');
   }
 }
