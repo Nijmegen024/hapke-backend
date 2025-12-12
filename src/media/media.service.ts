@@ -42,6 +42,9 @@ export class MediaService {
       });
 
     if (error) {
+      // log exact Supabase error
+      // eslint-disable-next-line no-console
+      console.error('SIGNED URL ERROR', error);
       throw new BadRequestException('Failed to create signed URL');
     }
 
