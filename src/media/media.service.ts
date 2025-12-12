@@ -13,17 +13,26 @@ export class MediaService {
   private supabaseUrl;
 
   constructor(private readonly vendors: VendorService) {
-    this.supabaseUrl = process.env.SUPABASE_URL ?? '';
-    this.supabase = createClient(
-      this.supabaseUrl,
-      process.env.SUPABASE_SERVICE_ROLE ?? '',
-    );
-    this.bucket = process.env.SUPABASE_BUCKET ?? 'Restaurant-media';
-    // debug
+    this.supabaseUrl = (process.env.SUPABASE_URL ?? '').trim();
+    this.bucket = (process.env.SUPABASE_BUCKET ?? 'Restaurant-media').trim();
+    const serviceRole = (process.env.SUPABASE_SERVICE_ROLE ?? '').trim();
+
+    // debug logging
     // eslint-disable-next-line no-console
     console.log('SUPABASE_URL =', this.supabaseUrl);
     // eslint-disable-next-line no-console
     console.log('SUPABASE_BUCKET =', this.bucket);
+    // eslint-disable-next-line no-console
+    console.log(
+      'SUPABASE_SERVICE_ROLE length =',
+      serviceRole ? serviceRole.length : 0,
+    );
+
+    if (!this.supabaseUrl || !serviceRole) {
+      throw new Error('Supabase config ontbreekt (URL of SERVICE_ROLE)');
+    }
+
+    this.supabase = createClient(this.supabaseUrl, serviceRole);
   }
 
   async signUpload(token: string | null, originalName?: string) {
