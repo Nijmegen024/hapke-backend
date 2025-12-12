@@ -19,6 +19,11 @@ export class MediaService {
       process.env.SUPABASE_SERVICE_ROLE ?? '',
     );
     this.bucket = process.env.SUPABASE_BUCKET ?? 'Restaurant-media';
+    // debug
+    // eslint-disable-next-line no-console
+    console.log('SUPABASE_URL =', this.supabaseUrl);
+    // eslint-disable-next-line no-console
+    console.log('SUPABASE_BUCKET =', this.bucket);
   }
 
   async signUpload(token: string | null, originalName?: string) {
