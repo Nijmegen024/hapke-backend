@@ -26,8 +26,9 @@ export class AuthService {
     'dev-access-secret';
   private readonly refreshTtl =
     process.env.JWT_REFRESH_TTL ?? process.env.JWT_REFRESH_EXPIRES_IN ?? '30d';
-  private readonly accessTtl =
-    process.env.JWT_ACCESS_TTL ?? process.env.JWT_EXPIRES_IN ?? '15m';
+  private readonly accessTtlSeconds = this.resolveAccessTtlSeconds(
+    process.env.JWT_ACCESS_TTL ?? process.env.JWT_EXPIRES_IN,
+  );
   private readonly refreshTtlMs = this.parseDurationToMs(
     this.refreshTtl,
     30 * 24 * 60 * 60 * 1000,
@@ -296,7 +297,7 @@ export class AuthService {
     };
     const accessToken = await this.jwtService.signAsync(payload, {
       secret: this.accessSecret,
-      expiresIn: this.accessTtl,
+      expiresIn: this.accessTtlSeconds,
     });
     const refreshToken = this.generateRefreshToken();
     const refreshExpiresAt = new Date(Date.now() + this.refreshTtlMs);
@@ -456,5 +457,16 @@ export class AuthService {
     return Object.values(value as Record<string, unknown>).every(
       (entry) => typeof entry === 'string',
     );
+  }
+
+  private resolveAccessTtlSeconds(envValue?: string) {
+    if (envValue) {
+      const asNumber = Number(envValue);
+      if (!Number.isNaN(asNumber) && asNumber > 0) {
+        return asNumber;
+      }
+    }
+    // default 7 dagen
+    return 60 * 60 * 24 * 7;
   }
 }

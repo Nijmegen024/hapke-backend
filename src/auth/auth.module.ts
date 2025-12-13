@@ -16,8 +16,7 @@ import { MailModule } from '../mail/mail.module';
       useFactory: () => ({
         secret: process.env.JWT_SECRET ?? 'dev-access-secret',
         signOptions: {
-          expiresIn:
-            process.env.JWT_ACCESS_TTL ?? process.env.JWT_EXPIRES_IN ?? '15m',
+          expiresIn: 60 * 60 * 24 * 7, // 7 dagen in seconden
         },
       }),
     }),
