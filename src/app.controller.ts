@@ -86,6 +86,9 @@ export class RestaurantsController {
       description: item.description ?? '',
       price: this.decimalToNumber(item.price) ?? 0,
       priceCents: this.priceToCents(item.price),
+      imageUrl: item.imageUrl,
+      isHighlighted: item.isHighlighted,
+      categoryId: item.categoryId,
     }));
   }
 
