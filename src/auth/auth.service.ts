@@ -20,10 +20,8 @@ export class AuthService {
   private readonly logger = new Logger(AuthService.name);
   private readonly refreshCookieName = 'refresh_token';
   private readonly refreshCookiePath = '/auth/refresh';
-  private readonly accessSecret =
-    process.env.JWT_ACCESS_SECRET ??
-    process.env.JWT_SECRET ??
-    'dev-access-secret';
+  // Gebruik één secret voor alle tokens
+  private readonly accessSecret = process.env.JWT_SECRET ?? 'dev-access-secret';
   private readonly refreshTtl =
     process.env.JWT_REFRESH_TTL ?? process.env.JWT_REFRESH_EXPIRES_IN ?? '30d';
   private readonly accessTtlSeconds = this.resolveAccessTtlSeconds(
