@@ -21,19 +21,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload) {
-    // Laat zowel gebruikers als vendors toe; geen harde rol-check
-    const account =
-      (await this.prisma.user.findUnique({ where: { id: payload.sub } })) ||
-      (await this.prisma.vendor.findUnique({ where: { id: payload.sub } }));
-
-    if (!account) {
+    // Vertrouw op de payload: geen DB-lookup meer (voorkomt 401 bij /friends)
+    if (!payload?.sub) {
       throw new UnauthorizedException('Token is niet langer geldig');
     }
-
     return {
-      id: account.id,
-      email: (account as any).email,
-      role: payload.role ?? (account as any).role ?? 'USER',
+      id: payload.sub,
+      email: payload.email,
+      role: payload.role ?? 'USER',
     };
   }
 }
