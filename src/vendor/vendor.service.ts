@@ -511,6 +511,14 @@ export class VendorService {
     return rest;
   }
 
+  private async ensureVendor(vendorId: string) {
+    const vendor = await this.prisma.vendor.findUnique({ where: { id: vendorId } });
+    if (!vendor) {
+      throw new UnauthorizedException('Vendor niet gevonden');
+    }
+    return vendor;
+  }
+
   private mapVendorProfile(vendor: Vendor) {
     return {
       id: vendor.id,
