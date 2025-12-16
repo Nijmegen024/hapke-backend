@@ -92,6 +92,22 @@ export class RestaurantsController {
     }));
   }
 
+  @Get(':id/videos')
+  async videos(@Param('id') id: string) {
+    return this.prisma.video.findMany({
+      where: { vendorId: id, isVisible: true },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        videoUrl: true,
+        thumbUrl: true,
+        createdAt: true,
+      },
+    });
+  }
+
   private decimalToNumber(
     value?: Prisma.Decimal | number | null,
   ): number | null {

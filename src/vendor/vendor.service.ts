@@ -22,6 +22,7 @@ import {
   CreateMenuItemDto,
   UpdateMenuItemDto,
 } from './dto/menu-item.dto';
+import { CreateVideoDto } from './dto/create-video.dto';
 
 type VendorTokenPayload = {
   sub: string;
@@ -469,6 +470,38 @@ export class VendorService {
       throw new BadRequestException('Menu item niet gevonden');
     }
     await this.prisma.vendorMenuItem.delete({ where: { id: itemId } });
+    return { ok: true };
+  }
+
+  async listVideos(vendorId: string) {
+    await this.ensureVendor(vendorId);
+    return this.prisma.video.findMany({
+      where: { vendorId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async createVideo(vendorId: string, dto: CreateVideoDto) {
+    await this.ensureVendor(vendorId);
+    return this.prisma.video.create({
+      data: {
+        vendorId,
+        title: dto.title,
+        description: dto.description,
+        videoUrl: dto.videoUrl,
+        thumbUrl: dto.thumbUrl,
+        isVisible: dto.isVisible ?? true,
+      },
+    });
+  }
+
+  async deleteVideo(vendorId: string, videoId: string) {
+    await this.ensureVendor(vendorId);
+    const video = await this.prisma.video.findUnique({ where: { id: videoId } });
+    if (!video || video.vendorId !== vendorId) {
+      throw new UnauthorizedException('Video niet gevonden of geen toegang');
+    }
+    await this.prisma.video.delete({ where: { id: videoId } });
     return { ok: true };
   }
 

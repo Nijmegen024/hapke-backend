@@ -30,6 +30,7 @@ import {
   UpdateMenuItemDto,
 } from './dto/menu-item.dto';
 import { UpdateRestaurantSettingsDto } from './dto/restaurant-settings.dto';
+import { CreateVideoDto } from './dto/create-video.dto';
 
 @Controller('vendor')
 export class VendorController {
@@ -213,6 +214,24 @@ export class VendorController {
   ) {
     const vendor = await this.vendors.authenticateRequest(req);
     return this.vendors.deleteMenuItem(vendor.id, id);
+  }
+
+  @Get('videos')
+  async listVideos(@Req() req: Request) {
+    const vendor = await this.vendors.authenticateRequest(req);
+    return this.vendors.listVideos(vendor.id);
+  }
+
+  @Post('videos')
+  async createVideo(@Req() req: Request, @Body() dto: CreateVideoDto) {
+    const vendor = await this.vendors.authenticateRequest(req);
+    return this.vendors.createVideo(vendor.id, dto);
+  }
+
+  @Delete('videos/:id')
+  async deleteVideo(@Req() req: Request, @Param('id') id: string) {
+    const vendor = await this.vendors.authenticateRequest(req);
+    return this.vendors.deleteVideo(vendor.id, id);
   }
 
   @Get('orders')

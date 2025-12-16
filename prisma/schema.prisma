@@ -149,6 +149,7 @@ model Vendor {
   orders      Order[]
   menuCategories VendorMenuCategory[]
   menuItems   VendorMenuItem[]
+  videos      Video[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
 }
@@ -202,4 +203,19 @@ model VendorMenuItem {
 
   @@index([vendorId, categoryId])
   @@index([vendorId, position])
+}
+
+model Video {
+  id          String   @id @default(cuid())
+  vendor      Vendor   @relation(fields: [vendorId], references: [id])
+  vendorId    String
+  title       String
+  description String?
+  videoUrl    String
+  thumbUrl    String?
+  isVisible   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@index([vendorId, createdAt])
 }
