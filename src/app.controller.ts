@@ -30,7 +30,9 @@ export class RestaurantsController {
         menuItems: {
           where: { isAvailable: true },
           orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+          include: { category: true },
         },
+        menuCategories: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] },
       },
     });
 
@@ -52,12 +54,19 @@ export class RestaurantsController {
         vendor.logoImageUrl ??
         'https://images.unsplash.com/photo-1541542684-4abf21a55761?auto=format&fit=crop&w=1200&q=80',
       isActive: vendor.isActive,
+      categories: vendor.menuCategories.map((category) => ({
+        id: category.id,
+        name: category.name,
+        description: category.description ?? '',
+        position: category.position,
+      })),
       menu: vendor.menuItems.map((item) => ({
         id: item.id,
         name: item.name,
         description: item.description ?? '',
         priceCents: this.priceToCents(item.price),
         categoryId: item.categoryId,
+        categoryName: item.category?.name ?? undefined,
         imageUrl: item.imageUrl,
         isHighlighted: item.isHighlighted,
       })),
@@ -74,6 +83,7 @@ export class RestaurantsController {
         menuItems: {
           where: { isAvailable: true },
           orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+          include: { category: true },
         },
       },
     });
@@ -89,6 +99,7 @@ export class RestaurantsController {
       imageUrl: item.imageUrl,
       isHighlighted: item.isHighlighted,
       categoryId: item.categoryId,
+      categoryName: item.category?.name ?? undefined,
     }));
   }
 
@@ -106,6 +117,27 @@ export class RestaurantsController {
         createdAt: true,
       },
     });
+  }
+
+  @Get(':id/categories')
+  async categories(@Param('id') id: string) {
+    const vendor = await this.prisma.vendor.findUnique({
+      where: { id },
+      include: {
+        menuCategories: {
+          orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+        },
+      },
+    });
+    if (!vendor) {
+      return [];
+    }
+    return vendor.menuCategories.map((category) => ({
+      id: category.id,
+      name: category.name,
+      description: category.description ?? '',
+      position: category.position,
+    }));
   }
 
   private decimalToNumber(
