@@ -16,7 +16,6 @@ import * as jwt from 'jsonwebtoken';
 import { AppService } from './app.service';
 import { PrismaService } from './prisma/prisma.service';
 
-@Controller()
 function extractUserId(req: Request): string | null {
   const auth = req.headers?.authorization;
   if (!auth || !auth.startsWith('Bearer ')) {
