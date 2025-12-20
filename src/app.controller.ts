@@ -1,9 +1,40 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
+import type { Request } from 'express';
+import { AuthGuard } from '@nestjs/passport';
+import * as jwt from 'jsonwebtoken';
 import { AppService } from './app.service';
 import { PrismaService } from './prisma/prisma.service';
 
 @Controller()
+function extractUserId(req: Request): string | null {
+  const auth = req.headers?.authorization;
+  if (!auth || !auth.startsWith('Bearer ')) {
+    return null;
+  }
+  const token = auth.substring('Bearer '.length).trim();
+  if (!token) return null;
+  try {
+    const decoded: any = jwt.verify(
+      token,
+      process.env.JWT_SECRET ?? 'dev-access-secret',
+    );
+    return decoded?.sub ?? decoded?.id ?? null;
+  } catch (_) {
+    return null;
+  }
+}
+
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
@@ -104,8 +135,9 @@ export class RestaurantsController {
   }
 
   @Get(':id/videos')
-  async videos(@Param('id') id: string) {
-    return this.prisma.video.findMany({
+  async videos(@Param('id') id: string, @Req() req: Request) {
+    const userId = extractUserId(req);
+    const videos = await this.prisma.video.findMany({
       where: { vendorId: id, isVisible: true },
       orderBy: { createdAt: 'desc' },
       select: {
@@ -114,9 +146,25 @@ export class RestaurantsController {
         description: true,
         videoUrl: true,
         thumbUrl: true,
+        vendorId: true,
         createdAt: true,
+        _count: { select: { likes: true } },
+        likes: userId
+          ? { where: { userId }, select: { id: true } }
+          : undefined,
       },
     });
+    return videos.map((video) => ({
+      id: video.id,
+      title: video.title,
+      description: video.description,
+      videoUrl: video.videoUrl,
+      thumbUrl: video.thumbUrl,
+      vendorId: video.vendorId,
+      createdAt: video.createdAt,
+      likesCount: video._count.likes,
+      likedByMe: userId ? (video.likes as any[])?.length > 0 : false,
+    }));
   }
 
   @Get(':id/categories')
@@ -156,5 +204,129 @@ export class RestaurantsController {
     const euros = this.decimalToNumber(value) ?? 0;
     const cents = Math.round(euros * 100);
     return cents < 0 ? 0 : cents;
+  }
+}
+
+@Controller('videos')
+export class VideosController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  @Get()
+  async list(@Req() req: Request) {
+    const userId = extractUserId(req);
+    const videos = await this.prisma.video.findMany({
+      where: { isVisible: true },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        videoUrl: true,
+        thumbUrl: true,
+        vendorId: true,
+        createdAt: true,
+        _count: { select: { likes: true } },
+        likes: userId
+          ? { where: { userId }, select: { id: true } }
+          : undefined,
+      },
+    });
+    return videos.map((video) => ({
+      id: video.id,
+      title: video.title,
+      description: video.description,
+      videoUrl: video.videoUrl,
+      thumbUrl: video.thumbUrl,
+      vendorId: video.vendorId,
+      createdAt: video.createdAt,
+      likesCount: video._count.likes,
+      likedByMe: userId ? (video.likes as any[])?.length > 0 : false,
+    }));
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post(':id/like')
+  async like(@Param('id') id: string, @Req() req: any) {
+    const userId = req.user?.id;
+    if (!userId) {
+      return { likesCount: 0, likedByMe: false };
+    }
+    await this.prisma.videoLike.upsert({
+      where: { videoId_userId: { videoId: id, userId } },
+      create: { videoId: id, userId },
+      update: {},
+    });
+    const likesCount = await this.prisma.videoLike.count({
+      where: { videoId: id },
+    });
+    return { likesCount, likedByMe: true };
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Delete(':id/like')
+  async unlike(@Param('id') id: string, @Req() req: any) {
+    const userId = req.user?.id;
+    if (!userId) {
+      return { likesCount: 0, likedByMe: false };
+    }
+    await this.prisma.videoLike.deleteMany({
+      where: { videoId: id, userId },
+    });
+    const likesCount = await this.prisma.videoLike.count({
+      where: { videoId: id },
+    });
+    return { likesCount, likedByMe: false };
+  }
+
+  @Get(':id/comments')
+  async listComments(@Param('id') id: string) {
+    const comments = await this.prisma.videoComment.findMany({
+      where: { videoId: id },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
+    return comments.map((c) => ({
+      id: c.id,
+      text: c.text,
+      createdAt: c.createdAt,
+      user: {
+        id: c.user?.id,
+        name: c.user?.name ?? c.user?.email ?? 'Onbekend',
+        email: c.user?.email,
+      },
+    }));
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post(':id/comments')
+  async addComment(
+    @Param('id') id: string,
+    @Body('text') text: string,
+    @Req() req: any,
+  ) {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new BadRequestException('Geen gebruiker');
+    }
+    const trimmed = (text ?? '').toString().trim();
+    if (!trimmed) {
+      throw new BadRequestException('Tekst is verplicht');
+    }
+    const comment = await this.prisma.videoComment.create({
+      data: { videoId: id, userId, text: trimmed },
+      include: { user: { select: { id: true, name: true, email: true } } },
+    });
+    return {
+      id: comment.id,
+      text: comment.text,
+      createdAt: comment.createdAt,
+      user: {
+        id: comment.user?.id,
+        name: comment.user?.name ?? comment.user?.email ?? 'Onbekend',
+        email: comment.user?.email,
+      },
+    };
   }
 }

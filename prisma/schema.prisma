@@ -25,6 +25,8 @@ model User {
   addresses            Address[]
   friendshipsRequested Friendship[]   @relation("FriendshipsRequested")
   friendshipsReceived  Friendship[]   @relation("FriendshipsReceived")
+  videoLikes           VideoLike[]
+  videoComments        VideoComment[]
 }
 
 model Chat {
@@ -217,5 +219,35 @@ model Video {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
 
+  likes    VideoLike[]
+  comments VideoComment[]
+
   @@index([vendorId, createdAt])
+}
+
+model VideoLike {
+  id        String   @id @default(cuid())
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  videoId   String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  createdAt DateTime @default(now())
+
+  @@unique([videoId, userId])
+  @@index([videoId])
+  @@index([userId])
+}
+
+model VideoComment {
+  id        String   @id @default(cuid())
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  videoId   String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  text      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([videoId])
+  @@index([userId])
 }

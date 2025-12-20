@@ -1,6 +1,10 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { AppController, RestaurantsController } from './app.controller';
+import {
+  AppController,
+  RestaurantsController,
+  VideosController,
+} from './app.controller';
 import { AppService } from './app.service';
 import { HealthController } from './health.controller';
 import { PrismaModule } from './prisma/prisma.module';
@@ -33,6 +37,7 @@ import { MediaModule } from './media/media.module';
   controllers: [
     AppController,
     RestaurantsController,
+    VideosController,
     HealthController,
   ],
   providers: [
