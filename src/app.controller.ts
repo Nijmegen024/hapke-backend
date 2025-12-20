@@ -34,6 +34,7 @@ function extractUserId(req: Request): string | null {
   }
 }
 
+@Controller()
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
