@@ -17,10 +17,30 @@ import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
+import { RequestEmailCodeDto } from './dto/request-email-code.dto';
+import { VerifyEmailCodeDto } from './dto/verify-email-code.dto';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Post('email/request-code')
+  @HttpCode(200)
+  async requestEmailCode(@Body() dto: RequestEmailCodeDto) {
+    return this.authService.requestEmailCode(dto.email);
+  }
+
+  @Post('email/verify-code')
+  @HttpCode(200)
+  async verifyEmailCode(@Body() dto: VerifyEmailCodeDto) {
+    return this.authService.verifyEmailCode(dto.email, dto.code);
+  }
+
+  @Post('email/resend-code')
+  @HttpCode(200)
+  async resendEmailCode(@Body() dto: RequestEmailCodeDto) {
+    return this.authService.resendEmailCode(dto.email);
+  }
 
   @Post('register')
   async register(@Body() dto: RegisterDto) {

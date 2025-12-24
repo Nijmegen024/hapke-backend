@@ -1,89 +1,81 @@
-import { Injectable } from '@nestjs/common';
-import nodemailer, { Transporter } from 'nodemailer';
+import { Injectable, Logger } from '@nestjs/common'
+import * as nodemailer from 'nodemailer'
 
 @Injectable()
 export class MailService {
-  private transporter: Transporter;
-  private defaultFrom: string;
+  private readonly logger = new Logger(MailService.name)
+  private transporter: nodemailer.Transporter | null = null
 
   constructor() {
-    const host = process.env.SMTP_HOST;
-    const port = Number(process.env.SMTP_PORT) || 587;
-    const secureEnv = (process.env.SMTP_SECURE || '').toString().toLowerCase();
-    const secure = secureEnv ? secureEnv === 'true' : false;
-
-    const user = process.env.SMTP_USER;
-    const pass = process.env.SMTP_PASS;
-
-    const fromEnv = (
-      process.env.FROM_EMAIL ||
-      process.env.SMTP_FROM ||
-      process.env.MAIL_FROM ||
-      ''
-    ).trim();
-    this.defaultFrom = fromEnv || 'Hapke <noreply@hapke.app>';
-
-    this.transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure,
-      requireTLS: !secure,
-      auth: user && pass ? { user, pass } : undefined,
-    });
-  }
-
-  async sendMail(to: string, subject: string, text: string, html?: string) {
-    try {
-      const info = (await this.transporter.sendMail({
-        from: this.defaultFrom,
-        to,
-        subject,
-        text,
-        html,
-      })) as unknown;
-      const messageId = extractMessageId(info);
-
-      console.log(
-        `Mail verstuurd naar ${to} (onderwerp: ${subject}, id: ${messageId})`,
-      );
-      return { ok: true };
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.warn(
-        `Mail verzenden mislukt naar ${to} (onderwerp: ${subject}): ${message}`,
-      );
-      return { ok: false, error: message };
+    // TODO: zet de volgende env vars in Render:
+    // SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
+    const host = process.env.SMTP_HOST
+    const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : undefined
+    const user = process.env.SMTP_USER
+    const pass = process.env.SMTP_PASS
+    if (host && port && user && pass) {
+      this.transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure: port === 465, // TODO: indien nodig, zet SMTP_SECURE=true
+        auth: { user, pass },
+      })
+    } else {
+      this.logger.warn('SMTP niet geconfigureerd; emails worden niet verstuurd.')
     }
   }
 
-  async verify() {
+  async sendMail(
+    to: string,
+    subject: string,
+    text: string,
+    html?: string,
+  ): Promise<{ ok: boolean; error?: string }> {
+    if (!this.transporter) {
+      const error = 'SMTP niet geconfigureerd';
+      this.logger.warn(`${error}; mail niet verzonden naar ${to}`);
+      return { ok: false, error };
+    }
+    const from = process.env.SMTP_FROM ?? 'no-reply@example.com';
     try {
-      await this.transporter.verify();
+      await this.transporter.sendMail({ from, to, subject, text, html });
       return { ok: true };
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      return { ok: false, error: message };
+    } catch (e) {
+      const error = e instanceof Error ? e.message : String(e);
+      this.logger.error(`Kon mail niet versturen naar ${to}: ${error}`);
+      return { ok: false, error };
+    }
+  }
+
+  async sendLoginCode(email: string, code: string) {
+    await this.sendMail(
+      email,
+      'Je Hapke verificatiecode',
+      `Jouw code is: ${code} (geldig 10 minuten)`,
+    )
+  }
+
+  async verify() {
+    if (!this.transporter) {
+      return { ok: false, message: 'SMTP niet geconfigureerd' }
+    }
+    try {
+      await this.transporter.verify()
+      return { ok: true, message: 'SMTP OK' }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      return { ok: false, message }
     }
   }
 
   configSummary() {
-    const port = Number(process.env.SMTP_PORT) || 587;
-    const secureEnv = (process.env.SMTP_SECURE || '').toString().toLowerCase();
-    const secure = secureEnv ? secureEnv === 'true' : false;
-    const host = process.env.SMTP_HOST || '';
-    return {
-      host,
-      port,
-      secure,
-      from: this.defaultFrom,
-    };
+    if (!this.transporter) {
+      return 'SMTP niet geconfigureerd'
+    }
+    const opts = this.transporter.options as Record<string, unknown>
+    const host = opts.host ?? 'host?'
+    const port = opts.port ?? 'port?'
+    const secure = opts.secure == null ? '' : opts.secure ? ' (secure)' : ''
+    return `${host}:${port}${secure}`
   }
 }
-
-const extractMessageId = (info: unknown) =>
-  typeof info === 'object' &&
-  info !== null &&
-  'messageId' in info &&
-  typeof (info as { messageId?: unknown }).messageId === 'string'
-    ? (info as { messageId: string }).messageId
-    : 'n/a';

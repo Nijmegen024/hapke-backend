@@ -48,6 +48,109 @@ export class AuthService {
     private readonly mailService: MailService,
   ) {}
 
+  async requestEmailCode(emailRaw: string) {
+    const email = this.normalizeEmail(emailRaw);
+    this.ensureValidEmail(email);
+
+    const latest = await this.prisma.loginCode.findFirst({
+      where: { email },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (
+      latest &&
+      Date.now() - latest.createdAt.getTime() <
+        this.getRateLimitMs(process.env.LOGIN_CODE_RATE_LIMIT_MS ?? '60000')
+    ) {
+      throw new BadRequestException('Wacht even en probeer opnieuw');
+    }
+
+    const code = this.generateNumericCode(6);
+    const codeHash = this.hashCode(code);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    await this.prisma.$transaction([
+      this.prisma.loginCode.deleteMany({ where: { email } }),
+      this.prisma.loginCode.create({
+        data: { email, codeHash, expiresAt },
+      }),
+    ]);
+
+    await this.mailService.sendLoginCode(email, code);
+
+    return { ok: true, expiresAt };
+  }
+
+  async resendEmailCode(emailRaw: string) {
+    // Zelfde flow als request, maar laat rate-limit intact
+    return this.requestEmailCode(emailRaw);
+  }
+
+  async verifyEmailCode(emailRaw: string, codeRaw: string) {
+    const email = this.normalizeEmail(emailRaw);
+    const code = (codeRaw ?? '').trim();
+    this.ensureValidEmail(email);
+    if (code.length < 4) {
+      throw new UnauthorizedException('Code ongeldig');
+    }
+
+    const record = await this.prisma.loginCode.findFirst({
+      where: { email },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!record) {
+      throw new UnauthorizedException('Code ongeldig');
+    }
+    if (record.expiresAt.getTime() < Date.now()) {
+      await this.prisma.loginCode.deleteMany({ where: { email } });
+      throw new UnauthorizedException('Code verlopen');
+    }
+    if (record.attempts >= 5) {
+      await this.prisma.loginCode.deleteMany({ where: { email } });
+      throw new UnauthorizedException('Te veel pogingen, vraag een nieuwe code aan');
+    }
+
+    const hashed = this.hashCode(code);
+    if (hashed !== record.codeHash) {
+      await this.prisma.loginCode.update({
+        where: { id: record.id },
+        data: { attempts: { increment: 1 } },
+      });
+      throw new UnauthorizedException('Code ongeldig');
+    }
+
+    await this.prisma.loginCode.deleteMany({ where: { email } });
+
+    let user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      const randomPassword = randomBytes(16).toString('hex');
+      const passwordHash = await bcrypt.hash(randomPassword, 10);
+      user = await this.prisma.user.create({
+        data: {
+          email,
+          passwordHash,
+          isVerified: true,
+        },
+      });
+    }
+
+    const tokens = await this.generateTokenPair(user);
+    await this.prisma.$transaction([
+      this.prisma.refreshToken.updateMany({
+        where: { userId: user.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+      this.prisma.refreshToken.create({
+        data: {
+          userId: user.id,
+          tokenHash: this.hashRefreshToken(tokens.refreshToken),
+          expiresAt: tokens.refreshExpiresAt,
+        },
+      }),
+    ]);
+
+    return { accessToken: tokens.accessToken, user: this.mapUser(user) };
+  }
+
   async register(dto: RegisterDto) {
     const email = dto.email.toLowerCase().trim();
 
@@ -466,5 +569,34 @@ export class AuthService {
     }
     // default 7 dagen
     return 60 * 60 * 24 * 7;
+  }
+
+  private normalizeEmail(value: string) {
+    return (value ?? '').toLowerCase().trim();
+  }
+
+  private ensureValidEmail(email: string) {
+    const emailOk = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
+    if (!emailOk) {
+      throw new BadRequestException('Ongeldig e-mailadres');
+    }
+  }
+
+  private generateNumericCode(length: number) {
+    const max = 10 ** length;
+    const num = Math.floor(Math.random() * max)
+      .toString()
+      .padStart(length, '0');
+    return num;
+  }
+
+  private hashCode(code: string) {
+    return createHash('sha256').update(code.trim()).digest('hex');
+  }
+
+  private getRateLimitMs(value: string) {
+    const parsed = Number(value);
+    if (!Number.isNaN(parsed) && parsed > 0) return parsed;
+    return 60000;
   }
 }
