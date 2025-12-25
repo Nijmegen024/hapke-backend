@@ -8,6 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { randomBytes, createHash } from 'crypto';
 import type { Request, Response } from 'express';
+import { OAuth2Client } from 'google-auth-library';
 
 import type { Address, User } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -41,6 +42,10 @@ export class AuthService {
   private readonly verificationUrlBase = this.resolveVerificationBase(
     process.env.VERIFICATION_URL_BASE,
   );
+  private readonly googleClientId = process.env.GOOGLE_CLIENT_ID?.trim();
+  private readonly googleClient = this.googleClientId
+    ? new OAuth2Client(this.googleClientId)
+    : null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -130,6 +135,61 @@ export class AuthService {
           passwordHash,
           isVerified: true,
         },
+      });
+    }
+
+    const tokens = await this.generateTokenPair(user);
+    await this.prisma.$transaction([
+      this.prisma.refreshToken.updateMany({
+        where: { userId: user.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+      this.prisma.refreshToken.create({
+        data: {
+          userId: user.id,
+          tokenHash: this.hashRefreshToken(tokens.refreshToken),
+          expiresAt: tokens.refreshExpiresAt,
+        },
+      }),
+    ]);
+
+    return { accessToken: tokens.accessToken, user: this.mapUser(user) };
+  }
+
+  async loginWithGoogle(idToken: string) {
+    if (!this.googleClient || !this.googleClientId) {
+      throw new BadRequestException('Google login niet geconfigureerd');
+    }
+    const ticket = await this.googleClient.verifyIdToken({
+      idToken,
+      audience: this.googleClientId,
+    });
+    const payload = ticket.getPayload();
+    if (!payload?.email) {
+      throw new UnauthorizedException('Google token ongeldig');
+    }
+    const email = payload.email.toLowerCase().trim();
+    const name = (payload.name ?? '').toString();
+    const sub = (payload.sub ?? '').toString();
+
+    let user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      // random password; we gebruiken enkel social login
+      const randomPassword = randomBytes(16).toString('hex');
+      const passwordHash = await bcrypt.hash(randomPassword, 10);
+      user = await this.prisma.user.create({
+        data: {
+          email,
+          name,
+          passwordHash,
+          isVerified: true,
+          verificationToken: null,
+        },
+      });
+    } else if (!user.isVerified) {
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: { isVerified: true, verificationToken: null, name },
       });
     }
 

@@ -19,6 +19,7 @@ import { LoginDto } from './dto/login.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { RequestEmailCodeDto } from './dto/request-email-code.dto';
 import { VerifyEmailCodeDto } from './dto/verify-email-code.dto';
+import { LoginGoogleDto } from './dto/login-google.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -40,6 +41,12 @@ export class AuthController {
   @HttpCode(200)
   async resendEmailCode(@Body() dto: RequestEmailCodeDto) {
     return this.authService.resendEmailCode(dto.email);
+  }
+
+  @Post('google')
+  @HttpCode(200)
+  async loginWithGoogle(@Body() dto: LoginGoogleDto) {
+    return this.authService.loginWithGoogle(dto.idToken);
   }
 
   @Post('register')
