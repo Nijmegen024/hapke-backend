@@ -19,6 +19,7 @@ import { FriendsModule } from './friends/friends.module';
 import { AdminModule } from './admin/admin.module';
 import { RolesGuard } from './auth/roles.guard';
 import { MediaModule } from './media/media.module';
+import { DebugController } from './debug.controller';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { MediaModule } from './media/media.module';
     RestaurantsController,
     VideosController,
     HealthController,
+    DebugController,
   ],
   providers: [
     AppService,

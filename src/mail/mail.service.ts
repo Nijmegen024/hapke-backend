@@ -7,18 +7,27 @@ export class MailService {
   private transporter: nodemailer.Transporter | null = null
 
   constructor() {
-    // TODO: zet de volgende env vars in Render:
-    // SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
-    const host = process.env.SMTP_HOST
+    const host = process.env.SMTP_HOST?.trim()
     const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : undefined
-    const user = process.env.SMTP_USER
+    const user = process.env.SMTP_USER?.trim()
     const pass = process.env.SMTP_PASS
+    const from = process.env.SMTP_FROM?.trim()
+    const secureFlag = (process.env.SMTP_SECURE ?? '').toLowerCase() === 'true'
+
     if (host && port && user && pass) {
+      const secure = secureFlag || port === 465
+      this.logger.log(
+        `SMTP config: host=${host} port=${port} secure=${secure} user=${user} from=${from ?? 'n/a'}`,
+      )
       this.transporter = nodemailer.createTransport({
         host,
         port,
-        secure: port === 465, // TODO: indien nodig, zet SMTP_SECURE=true
+        secure,
         auth: { user, pass },
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 20000,
+        requireTLS: !secure && port === 587 ? true : undefined,
       })
     } else {
       this.logger.warn('SMTP niet geconfigureerd; emails worden niet verstuurd.')
@@ -38,11 +47,15 @@ export class MailService {
     }
     const from = process.env.SMTP_FROM ?? 'no-reply@example.com';
     try {
-      await this.transporter.sendMail({ from, to, subject, text, html });
+      const info = await this.transporter.sendMail({ from, to, subject, text, html });
+      this.logger.log(`Mail verstuurd naar ${to} (messageId=${info.messageId ?? 'n/a'})`);
       return { ok: true };
-    } catch (e) {
-      const error = e instanceof Error ? e.message : String(e);
-      this.logger.error(`Kon mail niet versturen naar ${to}: ${error}`);
+    } catch (e: any) {
+      const error =
+        e instanceof Error ? e.message : typeof e === 'object' ? JSON.stringify(e) : String(e);
+      this.logger.error(
+        `Kon mail niet versturen naar ${to}: ${error} code=${e?.code ?? ''} errno=${e?.errno ?? ''} response=${e?.response ?? ''} command=${e?.command ?? ''}`,
+      );
       return { ok: false, error };
     }
   }
@@ -60,11 +73,18 @@ export class MailService {
       return { ok: false, message: 'SMTP niet geconfigureerd' }
     }
     try {
-      await this.transporter.verify()
-      return { ok: true, message: 'SMTP OK' }
-    } catch (e) {
+      const res = await this.transporter.verify()
+      return { ok: true, message: typeof res === 'string' ? res : 'SMTP OK' }
+    } catch (e: any) {
       const message = e instanceof Error ? e.message : String(e)
-      return { ok: false, message }
+      return {
+        ok: false,
+        message,
+        code: e?.code,
+        errno: e?.errno,
+        command: e?.command,
+        response: e?.response,
+      }
     }
   }
 
