@@ -86,12 +86,13 @@ export class OrdersService {
         receivedAt,
         vendorId,
         items: {
+          // cast naar any omdat Prisma client mogelijk nog oude velden heeft gegenereerd
           create: normalized.map((item) => ({
-            itemId: item.id,
-            name: item.name,
+            menuItemId: item.id,
+            productName: item.name,
             qty: item.qty,
-            price: new Prisma.Decimal(item.price.toFixed(2)),
-          })),
+            unitPrice: new Prisma.Decimal(item.price.toFixed(2)),
+          })) as any,
         },
       },
       include: { items: true },
@@ -114,11 +115,15 @@ export class OrdersService {
       total,
       createdAt: order.createdAt.toISOString(),
       etaMinutes: this.calculateEta(order),
-      items: order.items.map((item) => ({
-        id: item.itemId,
-        name: item.name,
+      items: (order.items as any[]).map((item: any) => ({
+        id: item.menuItemId ?? item.itemId ?? undefined,
+        productName: item.productName ?? item.name ?? '',
         qty: item.qty,
-        price: Number(item.price),
+        unitPrice: item.unitPrice
+          ? Number(item.unitPrice)
+          : item.price
+            ? Number(item.price)
+            : undefined,
       })),
       steps: this.mapSteps(order).map((step) => ({
         name: step.name,
@@ -183,7 +188,7 @@ export class OrdersService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return orders.map((order) => ({
+    return (orders as any).map((order: any) => ({
       orderId: order.orderNumber,
       status: order.status,
       total: Number(order.total),
