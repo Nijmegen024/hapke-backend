@@ -1,6 +1,7 @@
 export interface OrderItemInput {
   id: string;
   qty: number;
+  name?: string;
 }
 
 export interface NormalizedOrderItem {
@@ -69,7 +70,7 @@ export function nameFor(itemId: string): string {
 export function normalizeItems(items: OrderItemInput[]): NormalizedOrderItem[] {
   return items.map((item) => ({
     id: String(item.id),
-    name: nameFor(String(item.id)),
+    name: (item.name ?? '').toString().trim() || nameFor(String(item.id)),
     qty: Math.max(1, Number(item.qty) || 1),
     price: priceFor(String(item.id)),
   }));
