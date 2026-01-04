@@ -117,6 +117,7 @@ export class OrdersService {
       items: (order.items as any[]).map((item: any) => ({
         id: item.menuItemId ?? item.itemId ?? undefined,
         productName: item.productName ?? item.name ?? '',
+        name: item.productName ?? item.name ?? '',
         qty: item.qty,
         unitPrice: item.unitPrice
           ? Number(item.unitPrice)
@@ -176,6 +177,7 @@ export class OrdersService {
       items: (order.items as any[]).map((item: any) => ({
         id: item.menuItemId ?? item.itemId ?? undefined,
         productName: item.productName ?? item.name ?? '',
+        name: item.productName ?? item.name ?? '',
         qty: item.qty,
         unitPrice: item.unitPrice
           ? Number(item.unitPrice)
@@ -226,7 +228,8 @@ export class OrdersService {
       etaMinutes: this.calculateEta(order),
       items: order.items.map((item) => ({
         id: item.itemId,
-        name: item.name,
+        name: item.productName ?? item.name,
+        productName: item.productName ?? item.name,
         qty: item.qty,
         price: Number(item.price),
       })),
