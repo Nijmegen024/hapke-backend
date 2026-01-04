@@ -118,13 +118,13 @@ model Order {
 }
 
 model OrderItem {
-  id      String  @id @default(cuid())
-  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  orderId String
-  itemId  String
-  name    String
-  qty     Int
-  price   Decimal @db.Decimal(10, 2)
+  id          String   @id @default(cuid())
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId     String
+  menuItemId  String?
+  productName String
+  qty         Int
+  unitPrice   Decimal? @db.Decimal(10, 2)
 }
 
 model Vendor {

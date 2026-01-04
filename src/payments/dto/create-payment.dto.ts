@@ -21,6 +21,11 @@ export class PaymentItemDto {
   @IsOptional()
   @IsString()
   name?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  unitPrice?: number;
 }
 
 const ALLOWED_METHODS = ['ideal', 'creditcard', 'test-pay-later'] as const;
