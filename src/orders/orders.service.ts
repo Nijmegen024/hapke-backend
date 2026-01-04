@@ -37,17 +37,10 @@ export class OrdersService {
       throw new BadRequestException('Gebruiker niet bekend');
     }
 
-    const normalized = normalizeItems(dto.items);
     const paymentId = dto.paymentId?.toString().trim();
     if (!paymentId) {
       throw new BadRequestException('paymentId is verplicht');
     }
-
-    const total = normalized.reduce(
-      (sum, item) => sum + item.price * item.qty,
-      0,
-    );
-    await this.payments.ensurePaid(paymentId, total);
 
     const orderNumber = `ORD-${Date.now()}`;
     const receivedAt = new Date();
@@ -76,6 +69,12 @@ export class OrdersService {
       throw new BadRequestException('Restaurant niet gevonden');
     }
 
+    const normalized = normalizeItems(dto.items);
+    const enriched = await this.fillNamesAndPrices(normalized, vendorId);
+
+    const total = enriched.reduce((sum, item) => sum + item.price * item.qty, 0);
+    await this.payments.ensurePaid(paymentId, total);
+
     const order = await this.prisma.order.create({
       data: {
         orderNumber,
@@ -87,7 +86,7 @@ export class OrdersService {
         vendorId,
         items: {
           // cast naar any omdat Prisma client mogelijk nog oude velden heeft gegenereerd
-          create: normalized.map((item) => ({
+          create: enriched.map((item) => ({
             menuItemId: item.id,
             productName: item.name,
             qty: item.qty,
@@ -130,6 +129,33 @@ export class OrdersService {
         at: step.at ? step.at.toISOString() : null,
       })),
     };
+  }
+
+  private async fillNamesAndPrices(
+    items: ReturnType<typeof normalizeItems>,
+    vendorId: string,
+  ) {
+    const ids = Array.from(new Set(items.map((i) => i.id)));
+    const menuItems = await this.prisma.vendorMenuItem.findMany({
+      where: { vendorId, id: { in: ids } },
+      select: { id: true, name: true, price: true },
+    });
+    const byId = new Map(menuItems.map((m) => [m.id, m]));
+
+    return items.map((item) => {
+      const menu = byId.get(item.id);
+      const name =
+        (item.name && item.name.trim() && item.name !== item.id
+          ? item.name
+          : menu?.name) ?? item.id;
+      const price =
+        item.price && item.price > 0
+          ? item.price
+          : menu?.price
+            ? Number(menu.price)
+            : 0;
+      return { ...item, name, price };
+    });
   }
 
   async getOrderDetail(orderNumber: string, userId: string | undefined) {
