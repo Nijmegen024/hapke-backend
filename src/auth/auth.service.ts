@@ -160,9 +160,16 @@ export class AuthService {
     if (!this.googleClient || !this.googleClientId) {
       throw new BadRequestException('Google login niet geconfigureerd');
     }
+    const extraAudiences =
+      process.env.GOOGLE_ALLOWED_AUDIENCES?.split(',')
+        .map((s) => s.trim())
+        .filter(Boolean) ?? [];
+    const audiences = Array.from(
+      new Set([...extraAudiences, this.googleClientId].filter(Boolean)),
+    );
     const ticket = await this.googleClient.verifyIdToken({
       idToken,
-      audience: this.googleClientId,
+      audience: audiences,
     });
     const payload = ticket.getPayload();
     if (!payload?.email) {
