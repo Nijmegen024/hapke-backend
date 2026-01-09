@@ -42,8 +42,16 @@ export class AuthService {
   private readonly verificationUrlBase = this.resolveVerificationBase(
     process.env.VERIFICATION_URL_BASE,
   );
-  private readonly googleClientId = process.env.GOOGLE_CLIENT_ID?.trim();
-  private readonly googleClient = this.googleClientId
+  private readonly googleAudience = (
+    process.env.GOOGLE_ALLOWED_AUDIENCES ??
+    process.env.GOOGLE_CLIENT_ID ??
+    ''
+  )
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  private readonly googleClientId = this.googleAudience[0] ?? '';
+  private readonly googleClient = this.googleAudience.length > 0
     ? new OAuth2Client(this.googleClientId)
     : null;
 
@@ -160,16 +168,9 @@ export class AuthService {
     if (!this.googleClient || !this.googleClientId) {
       throw new BadRequestException('Google login niet geconfigureerd');
     }
-    const extraAudiences =
-      process.env.GOOGLE_ALLOWED_AUDIENCES?.split(',')
-        .map((s) => s.trim())
-        .filter(Boolean) ?? [];
-    const audiences = Array.from(
-      new Set([...extraAudiences, this.googleClientId].filter(Boolean)),
-    );
     const ticket = await this.googleClient.verifyIdToken({
       idToken,
-      audience: audiences,
+      audience: this.googleAudience,
     });
     const payload = ticket.getPayload();
     if (!payload?.email) {
