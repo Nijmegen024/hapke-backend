@@ -54,8 +54,22 @@ export class RestaurantsController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
-  async list() {
-    const vendors = await this.prisma.vendor.findMany({
+  async list(@Req() req: Request) {
+    const latParam = (req.query.lat as string | undefined)?.trim();
+    const lngParam = (req.query.lng as string | undefined)?.trim();
+
+    if (!latParam || !lngParam) {
+      throw new BadRequestException(
+        'Locatie ontbreekt. Geef lat en lng query parameters mee.',
+      );
+    }
+    const userLat = Number(latParam);
+    const userLng = Number(lngParam);
+    if (!Number.isFinite(userLat) || !Number.isFinite(userLng)) {
+      throw new BadRequestException('Ongeldige lat/lng opgegeven.');
+    }
+
+    const vendors = (await this.prisma.vendor.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
         menuItems: {
@@ -65,50 +79,68 @@ export class RestaurantsController {
         },
         menuCategories: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] },
       },
-    });
+    })) as any[];
 
-    const vendorRestaurants = vendors.map((vendor) => ({
-      id: vendor.id,
-      name: vendor.name,
-      cuisine:
-        vendor.cuisine ??
-        vendor.description ??
-        'Beschrijving nog in te vullen',
-      rating: vendor.isActive ? 4.5 : 0,
-      minOrder: this.decimalToNumber(vendor.minOrder) ?? 20,
-      deliveryCost: this.decimalToNumber(vendor.deliveryFee) ?? 0,
-      city: vendor.city,
-      category: vendor.category ?? 'Nieuw',
-      eta: vendor.etaDisplay ?? '35–45 min',
-      imageUrl:
-        vendor.heroImageUrl ??
-        vendor.logoImageUrl ??
-        'https://images.unsplash.com/photo-1541542684-4abf21a55761?auto=format&fit=crop&w=1200&q=80',
-      isActive: vendor.isActive,
-      categories: vendor.menuCategories.map((category) => ({
-        id: category.id,
-        name: category.name,
-        description: category.description ?? '',
-        position: category.position,
-      })),
-      menu: vendor.menuItems.map((item) => ({
-        id: item.id,
-        name: item.name,
-        description: item.description ?? '',
-        priceCents: this.priceToCents(item.price),
-        categoryId: item.categoryId,
-        categoryName: item.category?.name ?? undefined,
-        imageUrl: item.imageUrl,
-        isHighlighted: item.isHighlighted,
-      })),
-    }));
+    const vendorRestaurants = vendors
+      .map((vendor) => {
+        const radius = vendor.deliveryRadiusKm ?? 5;
+        if (
+          vendor.lat === null ||
+          vendor.lat === undefined ||
+          vendor.lng === null ||
+          vendor.lng === undefined
+        ) {
+          return null;
+        }
+        const distanceKm = this.haversineKm(userLat, userLng, vendor.lat, vendor.lng);
+        const withinRange = distanceKm <= radius;
+        if (!withinRange) return null;
+        return {
+          id: vendor.id,
+          name: vendor.name,
+          cuisine:
+            vendor.cuisine ??
+            vendor.description ??
+            'Beschrijving nog in te vullen',
+          rating: vendor.isActive ? 4.5 : 0,
+          minOrder: this.decimalToNumber(vendor.minOrder) ?? 20,
+          deliveryCost: this.decimalToNumber(vendor.deliveryFee) ?? 0,
+          city: vendor.city,
+          category: vendor.category ?? 'Nieuw',
+          eta: vendor.etaDisplay ?? '35–45 min',
+          imageUrl:
+            vendor.heroImageUrl ??
+            vendor.logoImageUrl ??
+            'https://images.unsplash.com/photo-1541542684-4abf21a55761?auto=format&fit=crop&w=1200&q=80',
+          isActive: vendor.isActive,
+          deliveryRadiusKm: radius,
+          distanceKm: Number(distanceKm.toFixed(2)),
+          categories: vendor.menuCategories.map((category) => ({
+            id: category.id,
+            name: category.name,
+            description: category.description ?? '',
+            position: category.position,
+          })),
+          menu: vendor.menuItems.map((item) => ({
+            id: item.id,
+            name: item.name,
+            description: item.description ?? '',
+            priceCents: this.priceToCents(item.price),
+            categoryId: item.categoryId,
+            categoryName: item.category?.name ?? undefined,
+            imageUrl: item.imageUrl,
+            isHighlighted: item.isHighlighted,
+          })),
+        };
+      })
+      .filter((v) => v !== null);
 
     return vendorRestaurants;
   }
 
   @Get(':id/menu')
   async menu(@Param('id') id: string) {
-    const vendor = await this.prisma.vendor.findUnique({
+    const vendor = (await this.prisma.vendor.findUnique({
       where: { id },
       include: {
         menuItems: {
@@ -117,7 +149,7 @@ export class RestaurantsController {
           include: { category: true },
         },
       },
-    });
+    })) as any;
     if (!vendor) {
       return [];
     }
@@ -204,6 +236,21 @@ export class RestaurantsController {
     const euros = this.decimalToNumber(value) ?? 0;
     const cents = Math.round(euros * 100);
     return cents < 0 ? 0 : cents;
+  }
+
+  private haversineKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const R = 6371; // km
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) *
+        Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
   }
 }
 

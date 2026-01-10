@@ -148,6 +148,9 @@ model Vendor {
   category    String?
   isFeatured  Boolean  @default(false)
   role       Role    @default(VENDOR)
+  lat        Float?
+  lng        Float?
+  deliveryRadiusKm Float @default(5)
   orders      Order[]
   menuCategories VendorMenuCategory[]
   menuItems   VendorMenuItem[]

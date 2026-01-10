@@ -30,6 +30,22 @@ export class UpdateRestaurantSettingsDto {
   logoImageUrl?: string;
 
   @Type(() => Number)
+  @IsOptional()
+  @IsNumber()
+  lat?: number;
+
+  @Type(() => Number)
+  @IsOptional()
+  @IsNumber()
+  lng?: number;
+
+  @Type(() => Number)
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  deliveryRadiusKm?: number;
+
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   minOrderAmount!: number;

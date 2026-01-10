@@ -1,6 +1,7 @@
 import {
   ArrayNotEmpty,
   IsArray,
+  IsNumber,
   IsOptional,
   IsString,
   ValidateNested,
@@ -22,6 +23,16 @@ export class CreateOrderDto {
   @IsOptional()
   @IsString()
   restaurantId?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  deliveryLat?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  deliveryLng?: number;
 
   @IsString()
   paymentId!: string;

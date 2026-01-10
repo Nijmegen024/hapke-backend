@@ -61,12 +61,49 @@ export class OrdersService {
       throw new InternalServerErrorException('Vendor configuratie ontbreekt');
     }
 
-    const vendorExists = await this.prisma.vendor.findUnique({
+    const vendorExists = (await this.prisma.vendor.findUnique({
       where: { id: vendorId },
-    });
+    })) as any;
 
     if (!vendorExists) {
       throw new BadRequestException('Restaurant niet gevonden');
+    }
+    const vendorCoords =
+      vendorExists?.lat !== null &&
+      vendorExists?.lat !== undefined &&
+      vendorExists?.lng !== null &&
+      vendorExists?.lng !== undefined
+        ? { lat: vendorExists.lat as number, lng: vendorExists.lng as number }
+        : null;
+    const vendorRadius =
+      typeof vendorExists?.deliveryRadiusKm === 'number'
+        ? (vendorExists.deliveryRadiusKm as number)
+        : 5;
+
+    if (vendorCoords) {
+      const userLat = dto.deliveryLat;
+      const userLng = dto.deliveryLng;
+      if (
+        userLat === null ||
+        userLat === undefined ||
+        userLng === null ||
+        userLng === undefined
+      ) {
+        throw new BadRequestException(
+          'Locatie ontbreekt. Vul deliveryLat en deliveryLng in.',
+        );
+      }
+      const distanceKm = this.haversineKm(
+        Number(userLat),
+        Number(userLng),
+        vendorCoords.lat,
+        vendorCoords.lng,
+      );
+      if (distanceKm > vendorRadius) {
+        throw new BadRequestException(
+          'Dit restaurant bezorgt niet op jouw adres.',
+        );
+      }
     }
 
     const normalized = normalizeItems(dto.items);
@@ -306,5 +343,20 @@ export class OrdersService {
       `Hapke bestelling ${order.orderNumber}`,
       text,
     );
+  }
+
+  private haversineKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const R = 6371; // km
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) *
+        Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
   }
 }

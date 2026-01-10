@@ -295,16 +295,9 @@ export class VendorService {
   }
 
   async getRestaurantSettings(vendorId: string) {
-    const vendor = await this.prisma.vendor.findUnique({
+    const vendor = (await this.prisma.vendor.findUnique({
       where: { id: vendorId },
-      select: {
-        name: true,
-        description: true,
-        minOrder: true,
-        heroImageUrl: true,
-        logoImageUrl: true,
-      },
-    });
+    })) as any;
     if (!vendor) {
       throw new UnauthorizedException('Vendor niet gevonden');
     }
@@ -314,6 +307,9 @@ export class VendorService {
       minOrderAmount: this.decimalToNumber(vendor.minOrder),
       heroImageUrl: this.normalizeString(vendor.heroImageUrl),
       logoImageUrl: this.normalizeString(vendor.logoImageUrl),
+      lat: vendor.lat ?? null,
+      lng: vendor.lng ?? null,
+      deliveryRadiusKm: vendor.deliveryRadiusKm ?? 5,
     };
   }
 
@@ -321,7 +317,7 @@ export class VendorService {
     vendorId: string,
     dto: UpdateRestaurantSettingsDto,
   ) {
-    const vendor = await this.prisma.vendor.update({
+    const vendor = (await this.prisma.vendor.update({
       where: { id: vendorId },
       data: {
         name: dto.name.trim(),
@@ -329,21 +325,23 @@ export class VendorService {
         minOrder: Number(dto.minOrderAmount),
         heroImageUrl: this.normalizeString(dto.heroImageUrl),
         logoImageUrl: this.normalizeString(dto.logoImageUrl),
-      },
-      select: {
-        name: true,
-        description: true,
-        minOrder: true,
-        heroImageUrl: true,
-        logoImageUrl: true,
-      },
-    });
+        lat: dto.lat ?? null,
+        lng: dto.lng ?? null,
+        deliveryRadiusKm:
+          dto.deliveryRadiusKm !== undefined
+            ? Number(dto.deliveryRadiusKm)
+            : undefined,
+      } as any,
+    })) as any;
     return {
       name: vendor.name,
       description: vendor.description,
       minOrderAmount: this.decimalToNumber(vendor.minOrder),
       heroImageUrl: this.normalizeString(vendor.heroImageUrl),
       logoImageUrl: this.normalizeString(vendor.logoImageUrl),
+      lat: vendor.lat ?? null,
+      lng: vendor.lng ?? null,
+      deliveryRadiusKm: vendor.deliveryRadiusKm ?? 5,
     };
   }
 
