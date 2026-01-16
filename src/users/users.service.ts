@@ -3,6 +3,7 @@ import type { Prisma, Address } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAddressDto } from './dto/create-address.dto';
 import { UpdateAddressDto } from './dto/update-address.dto';
+import { geocodeAddress } from '../utils/geocoding';
 
 @Injectable()
 export class UsersService {
@@ -10,16 +11,32 @@ export class UsersService {
 
   async createAddress(userId: string, dto: CreateAddressDto) {
     const addressCount = await this.prisma.address.count({ where: { userId } });
+    final street = dto.street.trim();
+    final houseNumber = dto.houseNumber.trim();
+    final postalCode = this.normalizePostalCode(dto.postalCode);
+    final city = dto.city.trim();
     const data: Prisma.AddressUncheckedCreateInput = {
       userId,
-      street: dto.street.trim(),
-      houseNumber: dto.houseNumber.trim(),
-      postalCode: this.normalizePostalCode(dto.postalCode),
-      city: dto.city.trim(),
+      street,
+      houseNumber,
+      postalCode,
+      city,
       isPrimary: addressCount === 0,
     };
-    if (dto.lat !== undefined) data.lat = dto.lat;
-    if (dto.lng !== undefined) data.lng = dto.lng;
+    if (dto.lat !== undefined && dto.lng !== undefined) {
+      data.lat = dto.lat;
+      data.lng = dto.lng;
+    } else {
+      const location = await geocodeAddress({
+        street: '$street $houseNumber'.trim(),
+        postalCode,
+        city,
+      });
+      if (location) {
+        data.lat = location.lat;
+        data.lng = location.lng;
+      }
+    }
 
     const address = await this.prisma.address.create({ data });
     return this.mapAddress(address);
@@ -30,7 +47,28 @@ export class UsersService {
       where: { userId },
       orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
     });
-    return addresses.map((address) => this.mapAddress(address));
+    const refreshed: Address[] = [];
+    for (final address of addresses) {
+      if (address.lat != null && address.lng != null) {
+        refreshed.add(address);
+        continue;
+      }
+      const location = await geocodeAddress({
+        street: '${address.street} ${address.houseNumber}'.trim(),
+        postalCode: address.postalCode,
+        city: address.city,
+      });
+      if (!location) {
+        refreshed.add(address);
+        continue;
+      }
+      const updated = await this.prisma.address.update({
+        where: { id: address.id },
+        data: { lat: location.lat, lng: location.lng },
+      });
+      refreshed.add(updated);
+    }
+    return refreshed.map((address) => this.mapAddress(address));
   }
 
   async updateAddress(
@@ -45,6 +83,32 @@ export class UsersService {
       throw new NotFoundException('Adres niet gevonden');
     }
     const data = this.mapUpdateDtoToData(dto);
+    final addressChanged =
+      dto.street != null ||
+      dto.houseNumber != null ||
+      dto.postalCode != null ||
+      dto.city != null;
+    if (
+      addressChanged &&
+      (dto.lat == null || dto.lng == null) &&
+      (data.lat == null || data.lng == null)
+    ) {
+      const street = (dto.street ?? existing.street).trim();
+      const houseNumber = (dto.houseNumber ?? existing.houseNumber).trim();
+      const postalCode = this.normalizePostalCode(
+        dto.postalCode ?? existing.postalCode,
+      );
+      const city = (dto.city ?? existing.city).trim();
+      const location = await geocodeAddress({
+        street: '$street $houseNumber'.trim(),
+        postalCode,
+        city,
+      });
+      if (location) {
+        data.lat = location.lat;
+        data.lng = location.lng;
+      }
+    }
     if (Object.keys(data).length === 0) {
       return this.mapAddress(existing);
     }
