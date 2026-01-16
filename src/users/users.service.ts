@@ -11,10 +11,10 @@ export class UsersService {
 
   async createAddress(userId: string, dto: CreateAddressDto) {
     const addressCount = await this.prisma.address.count({ where: { userId } });
-    final street = dto.street.trim();
-    final houseNumber = dto.houseNumber.trim();
-    final postalCode = this.normalizePostalCode(dto.postalCode);
-    final city = dto.city.trim();
+    const street = dto.street.trim();
+    const houseNumber = dto.houseNumber.trim();
+    const postalCode = this.normalizePostalCode(dto.postalCode);
+    const city = dto.city.trim();
     const data: Prisma.AddressUncheckedCreateInput = {
       userId,
       street,
@@ -28,7 +28,7 @@ export class UsersService {
       data.lng = dto.lng;
     } else {
       const location = await geocodeAddress({
-        street: '$street $houseNumber'.trim(),
+        street: `${street} ${houseNumber}`.trim(),
         postalCode,
         city,
       });
@@ -48,25 +48,25 @@ export class UsersService {
       orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
     });
     const refreshed: Address[] = [];
-    for (final address of addresses) {
+    for (const address of addresses) {
       if (address.lat != null && address.lng != null) {
-        refreshed.add(address);
+        refreshed.push(address);
         continue;
       }
       const location = await geocodeAddress({
-        street: '${address.street} ${address.houseNumber}'.trim(),
+        street: `${address.street} ${address.houseNumber}`.trim(),
         postalCode: address.postalCode,
         city: address.city,
       });
       if (!location) {
-        refreshed.add(address);
+        refreshed.push(address);
         continue;
       }
       const updated = await this.prisma.address.update({
         where: { id: address.id },
         data: { lat: location.lat, lng: location.lng },
       });
-      refreshed.add(updated);
+      refreshed.push(updated);
     }
     return refreshed.map((address) => this.mapAddress(address));
   }
@@ -83,7 +83,7 @@ export class UsersService {
       throw new NotFoundException('Adres niet gevonden');
     }
     const data = this.mapUpdateDtoToData(dto);
-    final addressChanged =
+    const addressChanged =
       dto.street != null ||
       dto.houseNumber != null ||
       dto.postalCode != null ||
@@ -100,7 +100,7 @@ export class UsersService {
       );
       const city = (dto.city ?? existing.city).trim();
       const location = await geocodeAddress({
-        street: '$street $houseNumber'.trim(),
+        street: `${street} ${houseNumber}`.trim(),
         postalCode,
         city,
       });
