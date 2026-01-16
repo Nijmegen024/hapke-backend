@@ -23,6 +23,7 @@ import {
   UpdateMenuItemDto,
 } from './dto/menu-item.dto';
 import { CreateVideoDto } from './dto/create-video.dto';
+import { geocodeAddress } from '../utils/geocoding';
 
 type VendorTokenPayload = {
   sub: string;
@@ -62,6 +63,10 @@ export class VendorService {
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
+    const street = this.normalizeString(dto.street);
+    const postalCode = this.normalizeString(dto.postalCode);
+    const city = this.normalizeString(dto.city);
+    const location = await geocodeAddress({ street, postalCode, city });
 
     const vendor = await this.prisma.vendor.create({
       data: {
@@ -70,10 +75,12 @@ export class VendorService {
         name,
         contactName: dto.contactName?.trim() || null,
         phone: dto.phone?.trim() || null,
-        street: dto.street?.trim() || null,
-        postalCode: dto.postalCode?.trim() || null,
-        city: dto.city?.trim() || null,
+        street,
+        postalCode,
+        city,
         description: dto.description?.trim() || null,
+        lat: location?.lat ?? null,
+        lng: location?.lng ?? null,
         isActive: false,
       },
     });
@@ -268,15 +275,36 @@ export class VendorService {
   }
 
   async updateVendorProfile(vendorId: string, dto: UpdateVendorProfileDto) {
+    const street = this.normalizeString(dto.street);
+    const postalCode = this.normalizeString(dto.postalCode);
+    const city = this.normalizeString(dto.city);
+    const shouldGeocode =
+      dto.street !== undefined ||
+      dto.postalCode !== undefined ||
+      dto.city !== undefined;
+    let location: { lat: number; lng: number } | null = null;
+    if (shouldGeocode) {
+      const existing = await this.prisma.vendor.findUnique({
+        where: { id: vendorId },
+      });
+      const nextStreet = street ?? existing?.street ?? null;
+      const nextPostalCode = postalCode ?? existing?.postalCode ?? null;
+      const nextCity = city ?? existing?.city ?? null;
+      location = await geocodeAddress({
+        street: nextStreet,
+        postalCode: nextPostalCode,
+        city: nextCity,
+      });
+    }
     const vendor = await this.prisma.vendor.update({
       where: { id: vendorId },
       data: {
         name: this.normalizeString(dto.name) ?? undefined,
         contactName: this.normalizeString(dto.contactName),
         phone: this.normalizeString(dto.phone),
-        street: this.normalizeString(dto.street),
-        postalCode: this.normalizeString(dto.postalCode),
-        city: this.normalizeString(dto.city),
+        street,
+        postalCode,
+        city,
         description: this.normalizeString(dto.description),
         heroImageUrl: this.normalizeString(dto.heroImageUrl),
         logoImageUrl: this.normalizeString(dto.logoImageUrl),
@@ -289,17 +317,34 @@ export class VendorService {
         category: this.normalizeString(dto.category),
         isActive: dto.isActive ?? undefined,
         isFeatured: dto.isFeatured ?? undefined,
+        ...(location ? { lat: location.lat, lng: location.lng } : {}),
       },
     });
     return this.mapVendorProfile(vendor);
   }
 
   async getRestaurantSettings(vendorId: string) {
-    const vendor = (await this.prisma.vendor.findUnique({
+    let vendor = (await this.prisma.vendor.findUnique({
       where: { id: vendorId },
     })) as any;
     if (!vendor) {
       throw new UnauthorizedException('Vendor niet gevonden');
+    }
+    if (
+      (vendor.lat === null || vendor.lat === undefined) &&
+      (vendor.lng === null || vendor.lng === undefined)
+    ) {
+      const location = await geocodeAddress({
+        street: vendor.street,
+        postalCode: vendor.postalCode,
+        city: vendor.city,
+      });
+      if (location) {
+        vendor = (await this.prisma.vendor.update({
+          where: { id: vendorId },
+          data: { lat: location.lat, lng: location.lng },
+        })) as any;
+      }
     }
     return {
       name: vendor.name,
@@ -325,8 +370,8 @@ export class VendorService {
         minOrder: Number(dto.minOrderAmount),
         heroImageUrl: this.normalizeString(dto.heroImageUrl),
         logoImageUrl: this.normalizeString(dto.logoImageUrl),
-        lat: dto.lat ?? null,
-        lng: dto.lng ?? null,
+        lat: dto.lat === undefined ? undefined : dto.lat,
+        lng: dto.lng === undefined ? undefined : dto.lng,
         deliveryRadiusKm:
           dto.deliveryRadiusKm !== undefined
             ? Number(dto.deliveryRadiusKm)
