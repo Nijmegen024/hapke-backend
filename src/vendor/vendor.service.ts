@@ -368,23 +368,32 @@ export class VendorService {
     const street = this.normalizeString(dto.street);
     const postalCode = this.normalizeString(dto.postalCode);
     const city = this.normalizeString(dto.city);
-    const shouldGeocode =
+    const addressTouched =
       dto.street !== undefined ||
       dto.postalCode !== undefined ||
       dto.city !== undefined;
     let location: { lat: number; lng: number } | null = null;
-    if (shouldGeocode) {
+    let nextStreet: string | null = null;
+    let nextPostalCode: string | null = null;
+    let nextCity: string | null = null;
+    if (addressTouched) {
       const existing = await this.prisma.vendor.findUnique({
         where: { id: vendorId },
       });
-      const nextStreet = street ?? existing?.street ?? null;
-      const nextPostalCode = postalCode ?? existing?.postalCode ?? null;
-      const nextCity = city ?? existing?.city ?? null;
-      location = await geocodeAddress({
-        street: nextStreet,
-        postalCode: nextPostalCode,
-        city: nextCity,
-      });
+      nextStreet = street ?? existing?.street ?? null;
+      nextPostalCode = postalCode ?? existing?.postalCode ?? null;
+      nextCity = city ?? existing?.city ?? null;
+      const hasAddress = Boolean(nextStreet || nextPostalCode || nextCity);
+      if (hasAddress && dto.lat === undefined && dto.lng === undefined) {
+        location = await geocodeAddress({
+          street: nextStreet,
+          postalCode: nextPostalCode,
+          city: nextCity,
+        });
+        if (!location) {
+          throw new BadRequestException('Adres niet gevonden');
+        }
+      }
     }
 
     const data: Prisma.VendorUpdateInput = {
@@ -398,9 +407,15 @@ export class VendorService {
           ? Number(dto.deliveryRadiusKm)
           : undefined,
     };
-    if (dto.street !== undefined) data.street = street;
-    if (dto.postalCode !== undefined) data.postalCode = postalCode;
-    if (dto.city !== undefined) data.city = city;
+    if (addressTouched) {
+      data.street = nextStreet;
+      data.postalCode = nextPostalCode;
+      data.city = nextCity;
+      if (!nextStreet && !nextPostalCode && !nextCity) {
+        data.lat = null;
+        data.lng = null;
+      }
+    }
     if (dto.lat !== undefined) data.lat = dto.lat;
     if (dto.lng !== undefined) data.lng = dto.lng;
     if (dto.lat === undefined && dto.lng === undefined && location) {
