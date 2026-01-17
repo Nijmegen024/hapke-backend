@@ -352,6 +352,9 @@ export class VendorService {
       minOrderAmount: this.decimalToNumber(vendor.minOrder),
       heroImageUrl: this.normalizeString(vendor.heroImageUrl),
       logoImageUrl: this.normalizeString(vendor.logoImageUrl),
+      street: vendor.street,
+      postalCode: vendor.postalCode,
+      city: vendor.city,
       lat: vendor.lat ?? null,
       lng: vendor.lng ?? null,
       deliveryRadiusKm: vendor.deliveryRadiusKm ?? 5,
@@ -362,21 +365,52 @@ export class VendorService {
     vendorId: string,
     dto: UpdateRestaurantSettingsDto,
   ) {
+    const street = this.normalizeString(dto.street);
+    const postalCode = this.normalizeString(dto.postalCode);
+    const city = this.normalizeString(dto.city);
+    const shouldGeocode =
+      dto.street !== undefined ||
+      dto.postalCode !== undefined ||
+      dto.city !== undefined;
+    let location: { lat: number; lng: number } | null = null;
+    if (shouldGeocode) {
+      const existing = await this.prisma.vendor.findUnique({
+        where: { id: vendorId },
+      });
+      const nextStreet = street ?? existing?.street ?? null;
+      const nextPostalCode = postalCode ?? existing?.postalCode ?? null;
+      const nextCity = city ?? existing?.city ?? null;
+      location = await geocodeAddress({
+        street: nextStreet,
+        postalCode: nextPostalCode,
+        city: nextCity,
+      });
+    }
+
+    const data: Prisma.VendorUpdateInput = {
+      name: dto.name.trim(),
+      description: this.normalizeString(dto.description),
+      minOrder: Number(dto.minOrderAmount),
+      heroImageUrl: this.normalizeString(dto.heroImageUrl),
+      logoImageUrl: this.normalizeString(dto.logoImageUrl),
+      deliveryRadiusKm:
+        dto.deliveryRadiusKm !== undefined
+          ? Number(dto.deliveryRadiusKm)
+          : undefined,
+    };
+    if (dto.street !== undefined) data.street = street;
+    if (dto.postalCode !== undefined) data.postalCode = postalCode;
+    if (dto.city !== undefined) data.city = city;
+    if (dto.lat !== undefined) data.lat = dto.lat;
+    if (dto.lng !== undefined) data.lng = dto.lng;
+    if (dto.lat === undefined && dto.lng === undefined && location) {
+      data.lat = location.lat;
+      data.lng = location.lng;
+    }
+
     const vendor = (await this.prisma.vendor.update({
       where: { id: vendorId },
-      data: {
-        name: dto.name.trim(),
-        description: this.normalizeString(dto.description),
-        minOrder: Number(dto.minOrderAmount),
-        heroImageUrl: this.normalizeString(dto.heroImageUrl),
-        logoImageUrl: this.normalizeString(dto.logoImageUrl),
-        lat: dto.lat === undefined ? undefined : dto.lat,
-        lng: dto.lng === undefined ? undefined : dto.lng,
-        deliveryRadiusKm:
-          dto.deliveryRadiusKm !== undefined
-            ? Number(dto.deliveryRadiusKm)
-            : undefined,
-      } as any,
+      data,
     })) as any;
     return {
       name: vendor.name,
@@ -384,6 +418,9 @@ export class VendorService {
       minOrderAmount: this.decimalToNumber(vendor.minOrder),
       heroImageUrl: this.normalizeString(vendor.heroImageUrl),
       logoImageUrl: this.normalizeString(vendor.logoImageUrl),
+      street: vendor.street,
+      postalCode: vendor.postalCode,
+      city: vendor.city,
       lat: vendor.lat ?? null,
       lng: vendor.lng ?? null,
       deliveryRadiusKm: vendor.deliveryRadiusKm ?? 5,

@@ -29,6 +29,21 @@ export class UpdateRestaurantSettingsDto {
   @MaxLength(500)
   logoImageUrl?: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  street?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  postalCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  city?: string;
+
   @Type(() => Number)
   @IsOptional()
   @IsNumber()
