@@ -15,6 +15,7 @@ import { AuthGuard } from '@nestjs/passport';
 import * as jwt from 'jsonwebtoken';
 import { AppService } from './app.service';
 import { PrismaService } from './prisma/prisma.service';
+import { MediaService } from './media/media.service';
 
 function extractUserId(req: Request): string | null {
   const auth = req.headers?.authorization;
@@ -51,7 +52,10 @@ export class AppController {
 
 @Controller('restaurants')
 export class RestaurantsController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly media: MediaService,
+  ) {}
 
   @Get()
   async list(@Req() req: Request) {
@@ -109,8 +113,8 @@ export class RestaurantsController {
           category: vendor.category ?? 'Nieuw',
           eta: vendor.etaDisplay ?? '35–45 min',
           imageUrl:
-            vendor.heroImageUrl ??
-            vendor.logoImageUrl ??
+            this.media.getPublicUrl(vendor.heroImageUrl) ??
+            this.media.getPublicUrl(vendor.logoImageUrl) ??
             'https://images.unsplash.com/photo-1541542684-4abf21a55761?auto=format&fit=crop&w=1200&q=80',
           isActive: vendor.isActive,
           deliveryRadiusKm: radius,
@@ -128,7 +132,7 @@ export class RestaurantsController {
             priceCents: this.priceToCents(item.price),
             categoryId: item.categoryId,
             categoryName: item.category?.name ?? undefined,
-            imageUrl: item.imageUrl,
+            imageUrl: this.media.getPublicUrl(item.imageUrl),
             isHighlighted: item.isHighlighted,
           })),
         };
@@ -159,7 +163,7 @@ export class RestaurantsController {
       description: item.description ?? '',
       price: this.decimalToNumber(item.price) ?? 0,
       priceCents: this.priceToCents(item.price),
-      imageUrl: item.imageUrl,
+      imageUrl: this.media.getPublicUrl(item.imageUrl),
       isHighlighted: item.isHighlighted,
       categoryId: item.categoryId,
       categoryName: item.category?.name ?? undefined,
@@ -190,8 +194,8 @@ export class RestaurantsController {
       id: video.id,
       title: video.title,
       description: video.description,
-      videoUrl: video.videoUrl,
-      thumbUrl: video.thumbUrl,
+      videoUrl: this.media.getPublicUrl(video.videoUrl),
+      thumbUrl: this.media.getPublicUrl(video.thumbUrl),
       vendorId: video.vendorId,
       createdAt: video.createdAt,
       likesCount: video._count.likes,
@@ -256,7 +260,10 @@ export class RestaurantsController {
 
 @Controller('videos')
 export class VideosController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly media: MediaService,
+  ) {}
 
   @Get()
   async list(@Req() req: Request) {
@@ -282,8 +289,8 @@ export class VideosController {
       id: video.id,
       title: video.title,
       description: video.description,
-      videoUrl: video.videoUrl,
-      thumbUrl: video.thumbUrl,
+      videoUrl: this.media.getPublicUrl(video.videoUrl),
+      thumbUrl: this.media.getPublicUrl(video.thumbUrl),
       vendorId: video.vendorId,
       createdAt: video.createdAt,
       likesCount: video._count.likes,

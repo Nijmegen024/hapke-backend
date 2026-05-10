@@ -64,7 +64,15 @@ export class MediaService {
 
     return {
       uploadUrl: data.signedUrl,
-      publicUrl: `${this.supabaseUrl}/storage/v1/object/public/${this.bucket}/${filePath}`,
+      publicUrl: this.getPublicUrl(filePath),
+      filePath, // Return the relative path
     };
+  }
+
+  getPublicUrl(filePath: string | null): string | null {
+    if (!filePath) return null;
+    if (filePath.startsWith('http')) return filePath; // Already absolute
+
+    return `${this.supabaseUrl}/storage/v1/object/public/${this.bucket}/${filePath}`;
   }
 }

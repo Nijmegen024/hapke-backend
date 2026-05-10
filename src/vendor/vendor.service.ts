@@ -24,6 +24,7 @@ import {
 } from './dto/menu-item.dto';
 import { CreateVideoDto } from './dto/create-video.dto';
 import { geocodeAddress } from '../utils/geocoding';
+import { stripSupabaseUrl } from '../utils/media';
 
 type VendorTokenPayload = {
   sub: string;
@@ -46,7 +47,7 @@ export class VendorService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
-  ) {}
+  ) { }
 
   async register(dto: RegisterVendorDto) {
     const email = dto.email.toLowerCase().trim();
@@ -306,8 +307,8 @@ export class VendorService {
         postalCode,
         city,
         description: this.normalizeString(dto.description),
-        heroImageUrl: this.normalizeString(dto.heroImageUrl),
-        logoImageUrl: this.normalizeString(dto.logoImageUrl),
+        heroImageUrl: stripSupabaseUrl(this.normalizeString(dto.heroImageUrl)),
+        logoImageUrl: stripSupabaseUrl(this.normalizeString(dto.logoImageUrl)),
         minOrder:
           dto.minOrder === undefined ? undefined : Number(dto.minOrder),
         deliveryFee:
@@ -400,8 +401,8 @@ export class VendorService {
       name: dto.name.trim(),
       description: this.normalizeString(dto.description),
       minOrder: Number(dto.minOrderAmount),
-      heroImageUrl: this.normalizeString(dto.heroImageUrl),
-      logoImageUrl: this.normalizeString(dto.logoImageUrl),
+      heroImageUrl: stripSupabaseUrl(this.normalizeString(dto.heroImageUrl)),
+      logoImageUrl: stripSupabaseUrl(this.normalizeString(dto.logoImageUrl)),
       deliveryRadiusKm:
         dto.deliveryRadiusKm !== undefined
           ? Number(dto.deliveryRadiusKm)
@@ -506,7 +507,7 @@ export class VendorService {
         name: dto.name.trim(),
         description: this.normalizeString(dto.description),
         price: dto.price,
-        imageUrl: this.normalizeString(dto.imageUrl),
+        imageUrl: stripSupabaseUrl(this.normalizeString(dto.imageUrl)),
         isAvailable: dto.isAvailable ?? true,
         isHighlighted: dto.isHighlighted ?? false,
         position: dto.position ?? 0,
@@ -548,7 +549,7 @@ export class VendorService {
         imageUrl:
           dto.imageUrl === undefined
             ? undefined
-            : this.normalizeString(dto.imageUrl),
+            : stripSupabaseUrl(this.normalizeString(dto.imageUrl)),
         isAvailable: dto.isAvailable ?? undefined,
         isHighlighted: dto.isHighlighted ?? undefined,
         position: dto.position ?? undefined,
@@ -583,8 +584,8 @@ export class VendorService {
         vendorId,
         title: dto.title,
         description: dto.description,
-        videoUrl: dto.videoUrl,
-        thumbUrl: dto.thumbUrl,
+        videoUrl: stripSupabaseUrl(dto.videoUrl)!,
+        thumbUrl: stripSupabaseUrl(dto.thumbUrl!),
         isVisible: dto.isVisible ?? true,
       },
     });

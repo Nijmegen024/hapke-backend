@@ -7,5 +7,6 @@ import { VendorModule } from '../vendor/vendor.module';
   imports: [VendorModule],
   controllers: [MediaController],
   providers: [MediaService],
+  exports: [MediaService],
 })
 export class MediaModule {}
