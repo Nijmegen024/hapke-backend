@@ -12,6 +12,8 @@ model User {
   email        String   @unique
   role         String?  @default("CUSTOMER")
   name         String?
+  phone        String?
+  gender       String?
   passwordHash String
   isVerified   Boolean  @default(false)
   verificationToken String? @unique

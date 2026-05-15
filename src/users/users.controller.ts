@@ -17,12 +17,23 @@ import { UsersService } from './users.service';
 import { CreateAddressDto } from './dto/create-address.dto';
 import { UpdateAddressDto } from './dto/update-address.dto';
 
+import { UpdateProfileDto } from './dto/update-profile.dto';
+
 @UseGuards(AuthGuard('jwt'))
-@Controller('users/addresses')
+@Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Post()
+  @Patch('me')
+  async updateProfile(
+    @Req() req: Request & { user?: { id?: string } },
+    @Body() dto: UpdateProfileDto,
+  ) {
+    const userId = this.requireUserId(req);
+    return this.usersService.updateProfile(userId, dto);
+  }
+
+  @Post('addresses')
   async create(
     @Req() req: Request & { user?: { id?: string } },
     @Body() dto: CreateAddressDto,
@@ -31,13 +42,13 @@ export class UsersController {
     return this.usersService.createAddress(userId, dto);
   }
 
-  @Get()
+  @Get('addresses')
   async list(@Req() req: Request & { user?: { id?: string } }) {
     const userId = this.requireUserId(req);
     return this.usersService.listAddresses(userId);
   }
 
-  @Patch(':id')
+  @Patch('addresses/:id')
   async update(
     @Req() req: Request & { user?: { id?: string } },
     @Param('id') id: string,
@@ -47,7 +58,7 @@ export class UsersController {
     return this.usersService.updateAddress(userId, id, dto);
   }
 
-  @Delete(':id')
+  @Delete('addresses/:id')
   @HttpCode(204)
   async remove(
     @Req() req: Request & { user?: { id?: string } },
@@ -57,7 +68,7 @@ export class UsersController {
     await this.usersService.deleteAddress(userId, id);
   }
 
-  @Patch(':id/primary')
+  @Patch('addresses/:id/primary')
   async setPrimary(
     @Req() req: Request & { user?: { id?: string } },
     @Param('id') id: string,

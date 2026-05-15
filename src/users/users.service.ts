@@ -1,13 +1,41 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import type { Prisma, Address } from '@prisma/client';
+import type { Prisma, Address, User } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAddressDto } from './dto/create-address.dto';
 import { UpdateAddressDto } from './dto/update-address.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { geocodeAddress } from '../utils/geocoding';
 
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async updateProfile(userId: string, dto: UpdateProfileDto) {
+    const data: Prisma.UserUpdateInput = {};
+    if (dto.name !== undefined) data.name = dto.name;
+    if (dto.phone !== undefined) data.phone = dto.phone;
+    if (dto.gender !== undefined) data.gender = dto.gender;
+
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data,
+    });
+
+    return this.mapUser(user);
+  }
+
+  private mapUser(user: User) {
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      phone: user.phone,
+      gender: user.gender,
+      isVerified: user.isVerified,
+      role: user.role,
+      createdAt: user.createdAt,
+    };
+  }
 
   async createAddress(userId: string, dto: CreateAddressDto) {
     const addressCount = await this.prisma.address.count({ where: { userId } });

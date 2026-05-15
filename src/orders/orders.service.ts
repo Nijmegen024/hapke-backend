@@ -263,12 +263,12 @@ export class OrdersService {
       total: Number(order.total),
       createdAt: order.createdAt.toISOString(),
       etaMinutes: this.calculateEta(order),
-      items: order.items.map((item) => ({
-        id: item.itemId,
+      items: order.items.map((item: any) => ({
+        id: item.menuItemId ?? item.itemId,
         name: item.productName ?? item.name,
         productName: item.productName ?? item.name,
         qty: item.qty,
-        price: Number(item.price),
+        price: item.unitPrice ? Number(item.unitPrice) : Number(item.price),
       })),
       steps: this.mapSteps(order).map((step) => ({
         name: step.name,
