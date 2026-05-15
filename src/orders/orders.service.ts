@@ -21,6 +21,8 @@ interface StepInfo {
   at: Date | null;
 }
 
+import { MediaService } from '../media/media.service';
+
 @Injectable()
 export class OrdersService {
   private readonly logger = new Logger(OrdersService.name);
@@ -29,6 +31,7 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly payments: PaymentsService,
     private readonly statusService: OrdersStatusService,
+    private readonly media: MediaService,
     @Optional() private readonly mail?: MailService,
   ) {}
 
@@ -199,29 +202,45 @@ export class OrdersService {
   async getOrderDetail(orderNumber: string, userId: string | undefined) {
     const order = await this.prisma.order.findFirst({
       where: { orderNumber, userId },
-      include: { items: true },
+      include: { items: true, vendor: true },
     });
     if (!order) {
       throw new NotFoundException('Bestelling niet gevonden');
     }
 
+    const itemIds = (order.items as any[]).map(i => i.menuItemId ?? i.itemId).filter(Boolean);
+    const menuItems = await this.prisma.vendorMenuItem.findMany({
+      where: { id: { in: itemIds } },
+      select: { id: true, imageUrl: true }
+    });
+    const imagesMap = new Map(menuItems.map(m => [m.id, m.imageUrl]));
+
+    const rawResImage = order.vendor?.heroImageUrl || order.vendor?.logoImageUrl;
+
     return {
       orderId: order.orderNumber,
       status: order.status,
       total: Number(order.total),
+      restaurantName: order.vendor?.name,
+      restaurantImage: rawResImage ? this.media.getPublicUrl(rawResImage) : null,
       createdAt: order.createdAt.toISOString(),
       etaMinutes: this.calculateEta(order),
-      items: (order.items as any[]).map((item: any) => ({
-        id: item.menuItemId ?? item.itemId ?? undefined,
-        productName: item.productName ?? item.name ?? '',
-        name: item.productName ?? item.name ?? '',
-        qty: item.qty,
-        unitPrice: item.unitPrice
-          ? Number(item.unitPrice)
-          : item.price
-            ? Number(item.price)
-            : undefined,
-      })),
+      items: (order.items as any[]).map((item: any) => {
+        const id = item.menuItemId ?? item.itemId ?? undefined;
+        const rawItemImage = id ? imagesMap.get(id) : null;
+        return {
+          id,
+          productName: item.productName ?? item.name ?? '',
+          name: item.productName ?? item.name ?? '',
+          qty: item.qty,
+          price: item.unitPrice
+            ? Number(item.unitPrice)
+            : item.price
+              ? Number(item.price)
+              : undefined,
+          imageUrl: rawItemImage ? this.media.getPublicUrl(rawItemImage) : null,
+        };
+      }),
       steps: this.mapSteps(order).map((step) => ({
         name: step.name,
         at: step.at ? step.at.toISOString() : null,
@@ -265,30 +284,34 @@ export class OrdersService {
     });
     const imagesMap = new Map(menuItems.map(m => [m.id, m.imageUrl]));
 
-    return (orders as any).map((order: any) => ({
-      orderId: order.orderNumber,
-      status: order.status,
-      total: Number(order.total),
-      restaurantName: order.vendor?.name,
-      restaurantImage: order.vendor?.heroImageUrl || order.vendor?.logoImageUrl,
-      createdAt: order.createdAt.toISOString(),
-      etaMinutes: this.calculateEta(order),
-      items: order.items.map((item: any) => {
-        const id = item.menuItemId ?? item.itemId;
-        return {
-          id,
-          name: item.productName ?? item.name,
-          productName: item.productName ?? item.name,
-          qty: item.qty,
-          price: item.unitPrice ? Number(item.unitPrice) : Number(item.price),
-          imageUrl: imagesMap.get(id) ?? null,
-        };
-      }),
-      steps: this.mapSteps(order).map((step) => ({
-        name: step.name,
-        at: step.at ? step.at.toISOString() : null,
-      })),
-    }));
+    return (orders as any).map((order: any) => {
+      const rawResImage = order.vendor?.heroImageUrl || order.vendor?.logoImageUrl;
+      return {
+        orderId: order.orderNumber,
+        status: order.status,
+        total: Number(order.total),
+        restaurantName: order.vendor?.name,
+        restaurantImage: rawResImage ? this.media.getPublicUrl(rawResImage) : null,
+        createdAt: order.createdAt.toISOString(),
+        etaMinutes: this.calculateEta(order),
+        items: order.items.map((item: any) => {
+          const id = item.menuItemId ?? item.itemId;
+          const rawItemImage = imagesMap.get(id);
+          return {
+            id,
+            name: item.productName ?? item.name,
+            productName: item.productName ?? item.name,
+            qty: item.qty,
+            price: item.unitPrice ? Number(item.unitPrice) : Number(item.price),
+            imageUrl: rawItemImage ? this.media.getPublicUrl(rawItemImage) : null,
+          };
+        }),
+        steps: this.mapSteps(order).map((step) => ({
+          name: step.name,
+          at: step.at ? step.at.toISOString() : null,
+        })),
+      };
+    });
   }
 
   private calculateEta(order: {

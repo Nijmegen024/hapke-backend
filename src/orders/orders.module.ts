@@ -6,8 +6,10 @@ import { OrdersController } from './orders.controller';
 import { MailModule } from '../mail/mail.module';
 import { PrismaService } from '../prisma/prisma.service';
 
+import { MediaModule } from '../media/media.module';
+
 @Module({
-  imports: [PaymentsModule, MailModule],
+  imports: [PaymentsModule, MailModule, MediaModule],
   controllers: [OrdersController],
   providers: [OrdersService, OrdersStatusService, PrismaService],
 })
