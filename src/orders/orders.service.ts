@@ -253,23 +253,37 @@ export class OrdersService {
     }
     const orders = await this.prisma.order.findMany({
       where: { userId },
-      include: { items: true },
+      include: { items: true, vendor: true },
       orderBy: { createdAt: 'desc' },
     });
+
+    // We need to get imageUrl for each item
+    const itemIds = orders.flatMap(o => o.items.map((i: any) => i.menuItemId ?? i.itemId)).filter(Boolean);
+    const menuItems = await this.prisma.vendorMenuItem.findMany({
+      where: { id: { in: itemIds } },
+      select: { id: true, imageUrl: true }
+    });
+    const imagesMap = new Map(menuItems.map(m => [m.id, m.imageUrl]));
 
     return (orders as any).map((order: any) => ({
       orderId: order.orderNumber,
       status: order.status,
       total: Number(order.total),
+      restaurantName: order.vendor?.name,
+      restaurantImage: order.vendor?.heroImageUrl || order.vendor?.logoImageUrl,
       createdAt: order.createdAt.toISOString(),
       etaMinutes: this.calculateEta(order),
-      items: order.items.map((item: any) => ({
-        id: item.menuItemId ?? item.itemId,
-        name: item.productName ?? item.name,
-        productName: item.productName ?? item.name,
-        qty: item.qty,
-        price: item.unitPrice ? Number(item.unitPrice) : Number(item.price),
-      })),
+      items: order.items.map((item: any) => {
+        const id = item.menuItemId ?? item.itemId;
+        return {
+          id,
+          name: item.productName ?? item.name,
+          productName: item.productName ?? item.name,
+          qty: item.qty,
+          price: item.unitPrice ? Number(item.unitPrice) : Number(item.price),
+          imageUrl: imagesMap.get(id) ?? null,
+        };
+      }),
       steps: this.mapSteps(order).map((step) => ({
         name: step.name,
         at: step.at ? step.at.toISOString() : null,
