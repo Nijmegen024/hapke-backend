@@ -9,10 +9,10 @@ async function main() {
   });
   console.log('Sample Videos:');
   console.log(JSON.stringify(videos, null, 2));
-  
+
   const totalVideos = await prisma.video.count();
   console.log('Total Videos:', totalVideos);
-
+  //Check for videos
   const supabaseVideos = await prisma.video.findMany({
     where: {
       videoUrl: {
